@@ -1,35 +1,56 @@
-import express from 'express';
-import { env } from './config';
+import app from './app';
+import { env } from './config/env';
 import logger from './logger';
-import { HttpStatus, SuccessMessages } from './constants';
+import { connectDB, disconnectDB } from './config/database';
+import mongoose from 'mongoose';
 
-const app = express();
-
-// Middleware
-app.use(express.json());
-
-// Test route
-app.get('/health', (req, res) => {
-  logger.info('Health check endpoint called');
-  res.status(HttpStatus.OK).json({
-    success: true,
-    message: SuccessMessages.FETCH_SUCCESS,
-    data: {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      environment: env.nodeEnv,
-    },
-  });
-});
-
-// Start server
 const PORT = env.port;
 
-app.listen(PORT, () => {
-  logger.info(`Server started on port ${PORT}`);
-  console.log(`
-    🚀 Server running on http://localhost:${PORT}
+// Connect to database first, then start server
+const startServer = async () => {
+  try {
+    // Connect to MongoDB
+    await connectDB();
+    
+    // Start server
+    const server = app.listen(PORT, () => {
+      logger.info(`🚀 Server started on port ${PORT}`);
+      logger.info(`
+    🚀 TailBuddies API Server Started!
     📍 Environment: ${env.nodeEnv}
-    🕒 ${new Date().toISOString()}
-  `);
+    🔗 Port: ${PORT}
+    📦 Database: ${mongoose.connection.name}
+    🕒 Time: ${new Date().toISOString()}
+    📡 URL: http://localhost:${PORT}
+    
+    📊 Health Check: http://localhost:${PORT}/health
+    🗄️  Test DB: http://localhost:${PORT}/test-db
+      `);
+    });
+
+    // Graceful shutdown
+    const gracefulShutdown = async () => {
+      logger.info('Received shutdown signal. Closing gracefully...');
+      server.close(async () => {
+        logger.info('HTTP server closed');
+        await disconnectDB();
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGTERM', gracefulShutdown);
+    process.on('SIGINT', gracefulShutdown);
+
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err: Error) => {
+  logger.error('UNHANDLED REJECTION! 💥 Shutting down...', err);
+  process.exit(1);
 });
+
+startServer();
