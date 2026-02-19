@@ -18,6 +18,7 @@ interface EnvConfig {
   cloudinaryApiKey: string;
   cloudinaryApiSecret: string;
   frontendUrl: string;
+  dbName?: string; 
 }
 
 class EnvValidator {
@@ -41,6 +42,8 @@ class EnvValidator {
       cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
       cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
       frontendUrl: process.env.FRONTEND_URL,
+       dbName: process.env.MONGO_URI ? 
+    process.env.MONGO_URI.split('/').pop()?.split('?')[0] : undefined,
     };
   }
 
