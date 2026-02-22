@@ -1,0 +1,3 @@
+Registered Routes:
+POST /api/signup
+POST /api/login
