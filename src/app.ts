@@ -5,6 +5,8 @@ import { env } from './config/env';
 import logger from './logger';
 import { HttpStatus, SuccessMessages, ErrorMessages } from './constants';
 import { Request, Response, NextFunction } from 'express';
+import routes from './routes';
+import authRoutes from './routes/auth.routes';
 
 const app = express();
 
@@ -17,7 +19,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path}`);
   next();
@@ -48,7 +49,7 @@ app.get('/test-db', async (req, res) => {
       2: 'connecting',
       3: 'disconnecting',
     };
-    
+
     res.status(HttpStatus.OK).json({
       success: true,
       message: 'Database status',
@@ -67,12 +68,21 @@ app.get('/test-db', async (req, res) => {
   }
 });
 
+
+app.use('/api/auth', authRoutes);
+app.use('/api', routes);
+
+
+
+
 // 404 handler
 app.use((req, res) => {
   logger.warn(`Route not found: ${req.method} ${req.originalUrl}`);
   res.status(HttpStatus.NOT_FOUND).json({
     success: false,
-    message: 'Route not found',
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+    path: req.path,
+    originalUrl: req.originalUrl,
   });
 });
 
