@@ -75,23 +75,37 @@ app.use('/api', routes);
 
 
 
+import { AppError } from './errors/app-error';
+
 // 404 handler
-app.use((req, res) => {
-  logger.warn(`Route not found: ${req.method} ${req.originalUrl}`);
-  res.status(HttpStatus.NOT_FOUND).json({
-    success: false,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
-    path: req.path,
-    originalUrl: req.originalUrl,
-  });
+app.use((req, res, next) => {
+  next(new AppError(`Route not found: ${req.method} ${req.originalUrl}`, HttpStatus.NOT_FOUND));
 });
 
 // Error handler
-app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-  logger.error('Unhandled error:', err);
-  res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+app.use((err: AppError, req: Request, res: Response, _next: NextFunction) => {
+  const statusCode = err.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+  const message = err.message || ErrorMessages.INTERNAL_SERVER;
+
+  if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
+    logger.error('Unhandled error:', {
+      message: err.message,
+      stack: err.stack,
+      path: req.path,
+      method: req.method
+    });
+  } else {
+    logger.warn(`Operational error: ${message}`, {
+      statusCode,
+      path: req.path,
+      method: req.method
+    });
+  }
+
+  res.status(statusCode).json({
     success: false,
-    message: err.message || ErrorMessages.INTERNAL_SERVER,
+    message: message,
+    ...(env.nodeEnv === 'development' && { stack: err.stack }),
   });
 });
 

@@ -6,7 +6,8 @@ import { IJwtService } from '../interfaces/IJwtService';
 import { IEmailService } from '../interfaces/IEmailService';
 import { UserRole } from '../../enums/user-role.enum';
 import { Gender } from '../../enums/gender.enum';
-import { ErrorMessages } from '../../constants';
+import { ErrorMessages, HttpStatus } from '../../constants';
+import { AppError } from '../../errors/app-error';
 import logger from '../../logger';
 import bcrypt from 'bcryptjs';
 
@@ -22,12 +23,12 @@ export class AuthService implements IAuthService {
 
     const user = await this.userRepository.findUserWithPassword(email);
     if (!user) {
-      throw new Error(ErrorMessages.INVALID_CREDENTIALS);
+      throw new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      throw new Error(ErrorMessages.INVALID_CREDENTIALS);
+      throw new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
     }
 
     const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: user.role });
@@ -48,7 +49,7 @@ export class AuthService implements IAuthService {
 
     const existingUser = await this.userRepository.findByEmail(email);
     if (existingUser) {
-      throw new Error(ErrorMessages.EMAIL_EXISTS);
+      throw new AppError(ErrorMessages.EMAIL_EXISTS, HttpStatus.CONFLICT);
     }
 
     const genderMap: Record<string, Gender> = {

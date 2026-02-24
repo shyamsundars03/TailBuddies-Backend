@@ -11,7 +11,7 @@ const startServer = async () => {
   try {
     // Connect to MongoDB
     await connectDB();
-    
+
     // Start server
     const server = app.listen(PORT, () => {
       logger.info(`🚀 Server started on port ${PORT}`);
