@@ -9,12 +9,17 @@ const PORT = env.port;
 // Connect to database first, then start server
 const startServer = async () => {
   try {
-    // Connect to MongoDB
-    await connectDB();
+    
 
-    // Start server
+    await connectDB();
+    
+    
     const server = app.listen(PORT, () => {
+
+
       logger.info(`🚀 Server started on port ${PORT}`);
+
+
       logger.info(`
     🚀 TailBuddies API Server Started!
     📍 Environment: ${env.nodeEnv}
@@ -22,10 +27,10 @@ const startServer = async () => {
     📦 Database: ${mongoose.connection.name}
     🕒 Time: ${new Date().toISOString()}
     📡 URL: http://localhost:${PORT}
-    
-    📊 Health Check: http://localhost:${PORT}/health
-    🗄️  Test DB: http://localhost:${PORT}/test-db
       `);
+
+
+
     });
 
     // Graceful shutdown
@@ -38,8 +43,11 @@ const startServer = async () => {
       });
     };
 
+
+
     process.on('SIGTERM', gracefulShutdown);
     process.on('SIGINT', gracefulShutdown);
+
 
   } catch (error) {
     logger.error('Failed to start server:', error);

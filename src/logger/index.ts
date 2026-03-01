@@ -1,5 +1,5 @@
 import winston from 'winston';
-import 'winston-daily-rotate-file';
+import DailyRotateFile from 'winston-daily-rotate-file';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -26,13 +26,13 @@ const transports: winston.transport[] = [
 
 if (!isDev) {
   transports.push(
-    new winston.transports.DailyRotateFile({
+    new DailyRotateFile({
       filename: 'logs/error-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
       level: 'error',
       maxFiles: '30d',
     }),
-    new winston.transports.DailyRotateFile({
+    new DailyRotateFile({
       filename: 'logs/combined-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
       maxFiles: '30d',
@@ -40,7 +40,7 @@ if (!isDev) {
   );
 } else {
   transports.push(
-    new winston.transports.DailyRotateFile({
+    new DailyRotateFile({
       filename: 'logs/dev-combined-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
       maxFiles: '7d',

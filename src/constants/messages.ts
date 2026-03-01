@@ -1,7 +1,7 @@
 export const ErrorMessages = {
   // Server
   INTERNAL_SERVER: 'Internal server error',
-  
+
   // Auth
   UNAUTHORIZED: 'Unauthorized access',
   FORBIDDEN: 'Forbidden: Insufficient permissions',
@@ -13,23 +13,27 @@ export const ErrorMessages = {
   EMAIL_EXISTS: 'Email already registered',
   PHONE_EXISTS: 'Phone number already registered',
   ACCOUNT_BLOCKED: 'Account is blocked',
-  ACCOUNT_NOT_VERIFIED: 'Account not verified',
-  
+  ACCOUNT_NOT_VERIFIED: 'Please verify your email first',
+  INVALID_OTP: 'Invalid OTP',
+  OTP_EXPIRED: 'OTP has expired. Please request a new one',
+  OTP_SEND_FAILED: 'Failed to send OTP',
+  ADMIN_INVALID_CREDENTIALS: 'Invalid admin credentials',
+
   // Validation
   INVALID_EMAIL: 'Invalid email format',
   INVALID_PHONE: 'Invalid phone number',
   PASSWORD_WEAK: 'Password must be at least 8 characters',
   PASSWORD_MISMATCH: 'Passwords do not match',
   REQUIRED_FIELD: 'This field is required',
-  
+
   // Resource
   NOT_FOUND: 'Resource not found',
   ALREADY_EXISTS: 'Resource already exists',
-  
+
   // Database
   DB_CONNECTION: 'Database connection error',
   DB_QUERY: 'Database query error',
-  
+
   // File
   FILE_TOO_LARGE: 'File too large',
   FILE_INVALID_TYPE: 'Invalid file type',
@@ -43,17 +47,19 @@ export const SuccessMessages = {
   REGISTER: 'Registration successful',
   EMAIL_VERIFIED: 'Email verified successfully',
   PASSWORD_CHANGED: 'Password changed successfully',
-  PASSWORD_RESET: 'Password reset link sent',
-  
+  PASSWORD_RESET: 'Password has been reset successfully',
+  PASSWORD_RESET_OTP_SENT: 'Password reset OTP sent to your email',
+  ADMIN_LOGIN: 'Admin login successful',
+
   // OTP
   OTP_SENT: 'OTP sent successfully',
   OTP_VERIFIED: 'OTP verified successfully',
-  
+
   // User
   USER_CREATED: 'User created successfully',
   USER_UPDATED: 'User updated successfully',
   USER_DELETED: 'User deleted successfully',
-  
+
   // General
   FETCH_SUCCESS: 'Data fetched successfully',
   OPERATION_SUCCESS: 'Operation completed successfully',

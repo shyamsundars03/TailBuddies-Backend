@@ -6,11 +6,12 @@ import { Gender } from '../enums/gender.enum';
 export interface IUser extends Document {
   userName: string;
   email: string;
-  phone: string;
-  password: string;
+  phone?: string;
+  password?: string;
   gender?: Gender;
   role: UserRole;
   profilePic?: string;
+  googleId?: string;
   isBlocked: boolean;
   isVerified: boolean;
   createdAt: Date;
@@ -35,14 +36,19 @@ const userSchema = new Schema<IUser>(
     },
     phone: {
       type: String,
-      required: [true, 'Phone number is required'],
+      required: false,
       match: [/^\d{10}$/, 'Please enter a valid 10-digit phone number'],
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      required: false,
       minlength: [6, 'Password must be at least 6 characters'],
       select: false,
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
     },
     gender: {
       type: String,
@@ -79,7 +85,7 @@ const userSchema = new Schema<IUser>(
 );
 
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || !this.password) return next();
 
   try {
     const salt = await bcrypt.genSalt(10);
