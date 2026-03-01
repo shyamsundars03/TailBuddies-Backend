@@ -48,18 +48,25 @@ class EnvValidator {
   }
 
   validate(): EnvConfig {
-    // Check existence
+    
+
     Object.entries(this.config).forEach(([key, value]) => {
       if (value === undefined || value === '') {
         this.errors.push(`Missing: ${key}`);
       }
     });
 
-    // Specific validations
-    this.validatePort();
-    this.validateMongoUri();
-    this.validateNodeEnv();
-    this.validateSmtpPort();
+    
+    
+
+
+  this.validatePort();
+  this.validateMongoUri();
+  this.validateNodeEnv();
+  this.validateSmtpPort();
+
+
+
 
     if (this.errors.length > 0) {
       throw new Error(
@@ -71,33 +78,42 @@ class EnvValidator {
     return this.config as EnvConfig;
   }
 
-  private validatePort() {
-    const port = this.config.port;
-    if (port && (port < 1024 || port > 65535)) {
-      this.errors.push('PORT must be between 1024 and 65535');
-    }
-  }
 
-  private validateMongoUri() {
-    const uri = this.config.mongoUri;
-    if (uri && !uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
-      this.errors.push('MONGO_URI must start with mongodb:// or mongodb+srv://');
-    }
-  }
 
-  private validateNodeEnv() {
-    const env = this.config.nodeEnv;
-    if (env && !['development', 'production', 'test'].includes(env)) {
-      this.errors.push('NODE_ENV must be development, production, or test');
-    }
-  }
 
-  private validateSmtpPort() {
-    const port = this.config.smtpPort;
-    if (port && (port < 1 || port > 65535)) {
-      this.errors.push('SMTP_PORT must be a valid port number');
-    }
-  }
+          private validatePort() {
+            const port = this.config.port;
+            if (port && (port < 1024 || port > 65535)) {
+              this.errors.push('PORT must be between 1024 and 65535');
+            }
+          }
+
+
+
+private validateMongoUri() {
+const uri = this.config.mongoUri;
+if (uri && !uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
+this.errors.push('MONGO_URI must start with mongodb:// or mongodb+srv://');
+}
+}
+
+private validateNodeEnv() {
+
+const env = this.config.nodeEnv;
+if (env && !['development', 'production', 'test'].includes(env)) {
+this.errors.push('NODE_ENV must be development, production, or test');
+}
+}
+
+private validateSmtpPort() {
+const port = this.config.smtpPort;
+if (port && (port < 1 || port > 65535)) {
+this.errors.push('SMTP_PORT must be a valid port number');
+}
+}
+
+
+
 }
 
 export const env = new EnvValidator().validate();

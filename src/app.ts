@@ -1,12 +1,13 @@
 import express from 'express';
 import cors from 'cors';
-import mongoose from 'mongoose';
+// import mongoose from 'mongoose';
 import { env } from './config/env';
 import logger from './logger';
-import { HttpStatus, SuccessMessages, ErrorMessages } from './constants';
+import { HttpStatus,  ErrorMessages } from './constants';
 import { Request, Response, NextFunction } from 'express';
 import routes from './routes';
 import authRoutes from './routes/auth.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app = express();
 
@@ -24,52 +25,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check route
-app.get('/health', (req, res) => {
-  logger.debug('Health check endpoint called');
-  res.status(HttpStatus.OK).json({
-    success: true,
-    message: SuccessMessages.FETCH_SUCCESS,
-    data: {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      environment: env.nodeEnv,
-      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    },
-  });
-});
 
-// Test DB route (temporary - remove later)
-app.get('/test-db', async (req, res) => {
-  try {
-    const dbStatus = mongoose.connection.readyState;
-    const statusMap: Record<number, string> = {
-      0: 'disconnected',
-      1: 'connected',
-      2: 'connecting',
-      3: 'disconnecting',
-    };
 
-    res.status(HttpStatus.OK).json({
-      success: true,
-      message: 'Database status',
-      data: {
-        status: statusMap[dbStatus],
-        database: mongoose.connection.name,
-        host: mongoose.connection.host,
-      },
-    });
-  } catch (error) {
-    logger.error('Error checking DB:', error);
-    res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: 'Error checking database',
-    });
-  }
-});
 
 
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api', routes);
 
 
@@ -86,13 +47,44 @@ app.use((req, res) => {
   });
 });
 
+
+
+
+
+
+
+
+
+
 // Error handler
-app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-  logger.error('Unhandled error:', err);
-  res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+  // Type-narrow 
+  const errObj = err as Record<string, unknown>;
+  const statusCode = (typeof errObj.statusCode === 'number' ? errObj.statusCode : null) || HttpStatus.INTERNAL_SERVER_ERROR;
+  const message = (typeof errObj.message === 'string' ? errObj.message : null) || ErrorMessages.INTERNAL_SERVER;
+  const stack = typeof errObj.stack === 'string' ? errObj.stack : undefined;
+
+  if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
+    logger.error('Unhandled server error:', {
+      message,
+      stack,
+      path: req.path
+    });
+  } else {
+    logger.warn('Business/Validation error:', {
+      statusCode,
+      message,
+      path: req.path
+    });
+  }
+
+  res.status(statusCode).json({
     success: false,
-    message: err.message || ErrorMessages.INTERNAL_SERVER,
+    message,
+    ...(process.env.NODE_ENV === 'development' && { stack })
   });
 });
+
+
 
 export default app;

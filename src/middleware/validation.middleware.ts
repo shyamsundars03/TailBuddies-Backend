@@ -3,6 +3,10 @@ import { body, validationResult } from 'express-validator';
 import { HttpStatus } from '../constants';
 
 export const validateRegistration = [
+
+
+
+
   body('username')
     .notEmpty().withMessage('Username is required')
     .isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
@@ -28,6 +32,9 @@ export const validateRegistration = [
     .optional()
     .isIn(['owner', 'doctor', 'admin']).withMessage('Invalid role value'),
 
+
+
+    
   (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -38,4 +45,8 @@ export const validateRegistration = [
     }
     next();
   },
+
+
+
+
 ];
