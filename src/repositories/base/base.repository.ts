@@ -2,13 +2,18 @@ import { Model, Document, FilterQuery, QueryOptions } from 'mongoose';
 import { IBaseRepository } from './base.repository.interface';
 
 export abstract class BaseRepository<T extends Document> implements IBaseRepository<T> {
+
+
+
   constructor(protected readonly model: Model<T>) { }
+
 
   async create(data: Partial<T>): Promise<T> {
     const entity = new this.model(data);
     return await entity.save();
   }
 
+  
   async findById(id: string): Promise<T | null> {
     return await this.model.findById(id);
   }
