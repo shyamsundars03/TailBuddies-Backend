@@ -31,3 +31,14 @@ coverage/
 # Misc
 temp/
 tmp/
+
+
+*.bat
+*.txt
+lint_results.json
+
+backend_lint_check.txt/
+backend_lint_check.json/
+lint_output.txt/
+lint_report.json/
+lint_reports_backend.json/
