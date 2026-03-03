@@ -21,11 +21,23 @@ router.post('/signin', adminController.adminLogin);
 router.use(authMiddleware as unknown as RequestHandler);
 router.use(adminOnly as unknown as RequestHandler);
 
+
+
+
+
+
+
 // Specialty Management
 router.post('/specialties', adminController.createSpecialty);
 router.get('/specialties', adminController.getSpecialties);
 router.patch('/specialties/:id', adminController.updateSpecialty);
 router.delete('/specialties/:id', adminController.deleteSpecialty);
+
+
+
+
+
+
 
 // User Management
 router.get('/users', adminController.getUsers);

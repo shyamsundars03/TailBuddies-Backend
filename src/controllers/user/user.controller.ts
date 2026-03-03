@@ -4,7 +4,14 @@ import { IUserService } from '../../services/interfaces/IUserService';
 import { HttpStatus, SuccessMessages } from '../../constants';
 
 export class UserController {
+
+
+
+
     constructor(private readonly userService: IUserService) { }
+
+
+
 
     getProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
@@ -19,6 +26,13 @@ export class UserController {
         }
     };
 
+
+
+
+
+
+
+
     updateProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const user = await this.userService.updateUserProfile(req.user!.userId, req.body);
@@ -31,6 +45,13 @@ export class UserController {
             next(error);
         }
     };
+
+
+
+
+
+
+
 
     updateProfilePic = async (
         req: AuthRequest,
@@ -63,6 +84,13 @@ export class UserController {
         }
     };
 
+
+
+
+
+
+
+
     initiateEmailChange = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             await this.userService.initiateEmailChange(req.user!.userId);
@@ -74,6 +102,13 @@ export class UserController {
             next(error);
         }
     };
+
+
+
+
+
+
+
 
     verifyCurrentEmail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
@@ -88,6 +123,14 @@ export class UserController {
         }
     };
 
+
+
+
+
+
+
+
+
     sendOtpToNewEmail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { newEmail } = req.body;
@@ -100,6 +143,13 @@ export class UserController {
             next(error);
         }
     };
+
+
+
+
+
+
+
 
     verifyNewEmail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
@@ -114,4 +164,9 @@ export class UserController {
             next(error);
         }
     };
+
+
+
+
+    
 }

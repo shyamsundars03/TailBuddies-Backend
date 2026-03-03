@@ -23,23 +23,37 @@ export interface AdminLoginResponseDto {
 }
 
 export class AdminService implements IAdminService {
+
+
+
     constructor(
         private readonly jwtService: IJwtService,
         private readonly specialtyRepository: ISpecialtyRepository,
         private readonly userRepository: IUserRepository
     ) { }
 
+
+
+
     async adminLogin(data: AdminLoginDto): Promise<AdminLoginResponseDto> {
+
+
+
         const { email, password } = data;
         const adminCount = await Admin.countDocuments();
+
 
         if (adminCount === 0) {
             logger.info('No admin found. Creating first admin account.', { email });
             const newAdmin = new Admin({ email, password });
             await newAdmin.save();
 
+
+
             const accessToken = this.jwtService.generateAccessToken({ userId: newAdmin.id, role: 'admin' });
             const refreshToken = this.jwtService.generateRefreshToken({ userId: newAdmin.id });
+
+
 
             return {
                 id: newAdmin.id,
@@ -51,17 +65,21 @@ export class AdminService implements IAdminService {
         }
 
         const admin = await Admin.findOne({ email: email.toLowerCase() });
+
         if (!admin) {
             throw new Error(ErrorMessages.ADMIN_INVALID_CREDENTIALS);
         }
+
 
         const isMatch = await admin.comparePassword(password);
         if (!isMatch) {
             throw new Error(ErrorMessages.ADMIN_INVALID_CREDENTIALS);
         }
 
+
         const accessToken = this.jwtService.generateAccessToken({ userId: admin.id, role: 'admin' });
         const refreshToken = this.jwtService.generateRefreshToken({ userId: admin.id });
+
 
         logger.info('Admin login successful', { adminId: admin.id });
 
@@ -74,14 +92,18 @@ export class AdminService implements IAdminService {
         };
     }
 
-    // Specialty Management
+
+
+
+
+// Specialty Management
     async createSpecialty(data: Partial<ISpecialty>): Promise<ISpecialty> {
 
         if (!data.name) {
             throw new Error("Specialty name is required");
         }
 
-        // 🔍 Check for existing specialty (case-insensitive)
+        
         const existing = await this.specialtyRepository.findOne({
             name: { $regex: new RegExp(`^${data.name}$`, "i") }
         });
@@ -107,9 +129,12 @@ export class AdminService implements IAdminService {
             sort: { createdAt: -1 }
         };
         const specialties = await this.specialtyRepository.findAll(filter, options);
-        // Since BaseRepository doesn't have countDocuments, we use the model directly or add it to repository
-        // For simplicity, let's assume we can get count from the model or implement count in repository
+        
+
+
         const total = await (this.specialtyRepository as unknown as { model: { countDocuments: Function } }).model.countDocuments(filter);
+        
+        
         return { specialties, total };
     }
 
@@ -121,8 +146,31 @@ export class AdminService implements IAdminService {
         return await this.specialtyRepository.delete(id);
     }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     // User Management
     async getUsers(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number, ownerCount: number, doctorCount: number }> {
+        
+        
+        
         const filter: Record<string, any> = {};
         if (role) filter.role = role;
 
@@ -141,7 +189,7 @@ export class AdminService implements IAdminService {
 
         const users = await this.userRepository.findAll(filter, options);
 
-        // Use type casting to access model if not exposed in interface
+        
         const userModel = (this.userRepository as unknown as { model: { countDocuments: Function } }).model;
         const total = await userModel.countDocuments(filter);
         const ownerCount = await userModel.countDocuments({ role: UserRole.OWNER });
@@ -150,9 +198,13 @@ export class AdminService implements IAdminService {
         return { users, total, ownerCount, doctorCount };
     }
 
+
+
     async toggleUserBlock(id: string): Promise<IUser | null> {
         const user = await this.userRepository.findById(id);
         if (!user) return null;
         return await this.userRepository.update(id, { isBlocked: !user.isBlocked });
     }
+
+    
 }
