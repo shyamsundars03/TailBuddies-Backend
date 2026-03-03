@@ -12,6 +12,9 @@ export interface AuthRequest extends Request {
     };
 }
 
+
+
+
 import { User } from '../models/user.models';
 
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -26,8 +29,10 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     try {
         const decoded = jwt.verify(token, env.jwtAccessSecret) as { userId: string, role: string };
 
-        // Only check block status for non-admin users (Admins are in a separate collection)
+        //slipped admin
         if (decoded.role !== UserRole.ADMIN) {
+
+
             const user = await User.findById(decoded.userId).select('isBlocked');
             if (!user) {
                 return next(new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND));

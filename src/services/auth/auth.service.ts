@@ -473,4 +473,31 @@ export class AuthService implements IAuthService {
 
 
 
+  ////////////////////////////////// Refresh Access Token 
+
+  async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string }> {
+    try {
+      const decoded = this.jwtService.verifyToken(refreshToken, process.env.JWT_REFRESH_SECRET || '') as { userId: string };
+      if (!decoded || !decoded.userId) {
+        throw new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
+      }
+
+      const user = await this.userRepository.findById(decoded.userId);
+      if (!user) {
+        throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+      }
+
+      if (user.isBlocked) {
+        throw new AppError(ErrorMessages.ACCOUNT_BLOCKED, HttpStatus.FORBIDDEN);
+      }
+
+      const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: user.role });
+      return { accessToken };
+    } catch (error) {
+      logger.error('Refresh Token Error:', error);
+      throw new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
+    }
+  }
+
+
 }
