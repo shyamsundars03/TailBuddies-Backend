@@ -280,7 +280,7 @@ export class AuthService implements IAuthService {
 
   /////////////////////////////////// Verify OTP 
 
-  async verifyOtp(email: string, otp: string, userData?: unknown): Promise<LoginResponseDto> {
+  async verifyOtp(email: string, otp: string, userData?: unknown, purpose?: string): Promise<LoginResponseDto> {
 
 
 
@@ -344,7 +344,9 @@ export class AuthService implements IAuthService {
       }
 
 
-      await this.otpRepository.deleteOtp(email);
+      if (purpose !== 'reset') {
+        await this.otpRepository.deleteOtp(email);
+      }
 
 
       const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: user.role });
@@ -412,9 +414,18 @@ export class AuthService implements IAuthService {
       throw new Error(ErrorMessages.INVALID_OTP);
     }
 
-    const user = await this.userRepository.findByEmail(email);
+    // Check if the new password is the same as the old one
+    // We fetch the user with the password field for comparison
+    const user = await this.userRepository.findUserWithPassword(email);
     if (!user) {
       throw new Error(ErrorMessages.USER_NOT_FOUND);
+    }
+
+    if (user.password) {
+      const isSamePassword = await user.comparePassword(newPassword);
+      if (isSamePassword) {
+        throw new Error('New password must be different from the current password');
+      }
     }
 
     user.password = newPassword;
