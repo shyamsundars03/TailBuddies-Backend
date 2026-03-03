@@ -12,7 +12,7 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-// Helper to get statusCode from unknown error (for AppError instances)
+// Helper for AppError instances
 function getErrorStatus(error: unknown): number | undefined {
   if (typeof error === 'object' && error !== null && 'statusCode' in error) {
     const statusCode = (error as { statusCode: unknown }).statusCode;
@@ -348,6 +348,53 @@ export class AuthController {
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.PASSWORD_CHANGED,
+      });
+    } catch (error: unknown) {
+      next(error);
+    }
+  };
+
+  refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const refreshToken = req.cookies?.refreshToken;
+      if (!refreshToken) {
+        logger.warn('Refresh token missing in cookies', { path: req.path });
+        return next(new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED));
+      }
+
+      const result = await this.authService.refreshAccessToken(refreshToken);
+
+      res.status(HttpStatus.OK).json({
+        success: true,
+        data: {
+          accessToken: result.accessToken,
+        },
+      });
+    } catch (error: unknown) {
+
+      // If refresh token is invalid/expired, clear the cookie
+
+      
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+      next(error);
+    }
+  };
+
+  logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+
+      res.status(HttpStatus.OK).json({
+        success: true,
+        message: SuccessMessages.LOGOUT || 'Logged out successfully',
       });
     } catch (error: unknown) {
       next(error);

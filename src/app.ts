@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 // import mongoose from 'mongoose';
 import { env } from './config/env';
 import logger from './logger';
@@ -13,6 +14,7 @@ import userRoutes from './routes/user.routes';
 const app = express();
 
 // Middleware
+app.use(cookieParser());
 app.use(cors({
   origin: env.frontendUrl || 'http://localhost:3000',
   credentials: true,
