@@ -9,6 +9,9 @@ export interface LoginResponseDto {
     userName: string;
     email: string;
     role: string;
+    phone?: string;
+    gender?: string;
+    profilePic?: string;
     accessToken: string;
     refreshToken: string;
 }

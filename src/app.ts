@@ -3,11 +3,12 @@ import cors from 'cors';
 // import mongoose from 'mongoose';
 import { env } from './config/env';
 import logger from './logger';
-import { HttpStatus,  ErrorMessages } from './constants';
+import { HttpStatus, ErrorMessages } from './constants';
 import { Request, Response, NextFunction } from 'express';
 import routes from './routes';
 import authRoutes from './routes/auth.routes';
 import adminRoutes from './routes/admin.routes';
+import userRoutes from './routes/user.routes';
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/user', userRoutes);
 app.use('/api', routes);
 
 

@@ -13,7 +13,7 @@ export abstract class BaseRepository<T extends Document> implements IBaseReposit
     return await entity.save();
   }
 
-  
+
   async findById(id: string): Promise<T | null> {
     return await this.model.findById(id);
   }
