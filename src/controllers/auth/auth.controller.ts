@@ -189,8 +189,8 @@ export class AuthController {
 
   verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { email, otp, userData } = req.body;
-      const result = await this.authService.verifyOtp(email, otp, userData);
+      const { email, otp, userData, purpose } = req.body;
+      const result = await this.authService.verifyOtp(email, otp, userData, purpose);
 
 
       res.cookie('refreshToken', result.refreshToken, {
@@ -374,7 +374,7 @@ export class AuthController {
 
       // If refresh token is invalid/expired, clear the cookie
 
-      
+
       res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
