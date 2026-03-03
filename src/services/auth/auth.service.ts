@@ -41,7 +41,7 @@ export class AuthService implements IAuthService {
 
   private async sendOtpToEmail(email: string): Promise<string> {
     const otp = this.generateOtp();
-    const expiresAt = new Date(Date.now() + 90 * 1000);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
     await this.otpRepository.createOtp(email, otp, expiresAt);
     const sent = await this.emailService.sendOTP(email, otp);
     if (!sent) {
@@ -91,10 +91,10 @@ export class AuthService implements IAuthService {
       throw new Error(ErrorMessages.ACCOUNT_NOT_VERIFIED);
     }
 
-              //(Google users)
-              if (!user.password) {
-                throw new Error('This account uses Google Sign-in. Please use the Google button.');
-              }
+    //(Google users)
+    if (!user.password) {
+      throw new Error('This account uses Google Sign-in. Please use the Google button.');
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
@@ -111,6 +111,9 @@ export class AuthService implements IAuthService {
       userName: user.userName,
       email: user.email,
       role: user.role,
+      phone: user.phone,
+      gender: user.gender,
+      profilePic: user.profilePic,
       accessToken,
       refreshToken,
     };
@@ -152,7 +155,7 @@ export class AuthService implements IAuthService {
       let user = await this.userRepository.findByEmail(email);
 
       if (user) {
-        
+
 
 
 
@@ -160,12 +163,17 @@ export class AuthService implements IAuthService {
           throw new Error(`Account already exists with role ${user.role}. Please sign in with correct role.`);
         }
 
+        // Check blocked for existing Google user
+        if (user.isBlocked) {
+          throw new Error(ErrorMessages.ACCOUNT_BLOCKED);
+        }
 
 
 
 
 
-        
+
+
         if (!user.googleId) {
           user.googleId = googleId;
           if (!user.profilePic) user.profilePic = profilePic;
@@ -177,7 +185,7 @@ export class AuthService implements IAuthService {
 
 
       } else {
-        
+
         user = await this.userRepository.create({
           userName,
           email,
@@ -198,6 +206,9 @@ export class AuthService implements IAuthService {
         userName: user.userName,
         email: user.email,
         role: user.role,
+        phone: user.phone,
+        gender: user.gender,
+        profilePic: user.profilePic,
         accessToken,
         refreshToken,
       };
@@ -229,7 +240,7 @@ export class AuthService implements IAuthService {
 
     const { username, email, role } = data;
 
-    
+
     const existingUser = await this.userRepository.findByEmail(email);
     if (existingUser) {
       if (existingUser.role !== role) {
@@ -238,7 +249,7 @@ export class AuthService implements IAuthService {
       throw new Error(ErrorMessages.EMAIL_EXISTS);
     }
 
-    
+
 
     await this.sendOtpToEmail(email);
 
@@ -283,18 +294,18 @@ export class AuthService implements IAuthService {
         throw new AppError(ErrorMessages.INVALID_OTP, HttpStatus.BAD_REQUEST);
       }
 
-      
+
 
       let user;
       if (userData) {
         const { username, phone, password, gender, role } = userData as RegisterDto;
 
-        
+
         const existingUser = await this.userRepository.findByEmail(email);
         if (existingUser) {
           user = existingUser;
         } else {
-          
+
 
           const genderKey = gender ? (gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase()) : '';
           const genderMap: Record<string, Gender> = {
@@ -303,7 +314,7 @@ export class AuthService implements IAuthService {
             'Other': Gender.OTHER
           };
 
-          
+
           const targetRole = role?.toLowerCase() === 'doctor' ? UserRole.DOCTOR : UserRole.OWNER;
 
           logger.info('Creating new user from OTP verification', { email, role: targetRole });
@@ -320,7 +331,7 @@ export class AuthService implements IAuthService {
 
         }
       } else {
-        
+
 
 
         user = await this.userRepository.findByEmail(email);
@@ -332,10 +343,10 @@ export class AuthService implements IAuthService {
 
       }
 
-      
+
       await this.otpRepository.deleteOtp(email);
 
-      
+
       const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: user.role });
       const refreshToken = this.jwtService.generateRefreshToken({ userId: user.id });
 
@@ -346,6 +357,9 @@ export class AuthService implements IAuthService {
         userName: user.userName,
         email: user.email,
         role: user.role,
+        phone: user.phone,
+        gender: user.gender,
+        profilePic: user.profilePic,
         accessToken,
         refreshToken,
       };
@@ -458,5 +472,5 @@ export class AuthService implements IAuthService {
 
 
 
-  
+
 }

@@ -47,10 +47,28 @@ export class AuthController {
       const data: LoginDto = req.body;
       const result = await this.authService.login(data);
 
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.LOGIN,
-        data: result,
+        data: {
+          user: {
+            id: result.id,
+            userName: result.userName,
+            email: result.email,
+            role: result.role,
+            phone: result.phone,
+            gender: result.gender,
+            profilePic: result.profilePic,
+          },
+          accessToken: result.accessToken,
+        },
       });
 
     } catch (error: unknown) {
@@ -124,12 +142,12 @@ export class AuthController {
       const { idToken, role } = req.body;
       const result = await this.authService.googleLogin(idToken, role);
 
-      
+
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, 
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
       res.status(HttpStatus.OK).json({
@@ -141,6 +159,9 @@ export class AuthController {
             userName: result.userName,
             email: result.email,
             role: result.role,
+            phone: result.phone,
+            gender: result.gender,
+            profilePic: result.profilePic,
           },
           accessToken: result.accessToken,
         },
@@ -171,12 +192,12 @@ export class AuthController {
       const { email, otp, userData } = req.body;
       const result = await this.authService.verifyOtp(email, otp, userData);
 
-      
+
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, 
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
       res.status(HttpStatus.OK).json({
@@ -188,6 +209,9 @@ export class AuthController {
             userName: result.userName,
             email: result.email,
             role: result.role,
+            phone: result.phone,
+            gender: result.gender,
+            profilePic: result.profilePic,
           },
           accessToken: result.accessToken,
         },
@@ -255,7 +279,7 @@ export class AuthController {
         message: SuccessMessages.PASSWORD_RESET_OTP_SENT,
       });
     } catch (error: unknown) {
-      
+
       const statusCode = getErrorStatus(error);
       if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
         return next(error);
