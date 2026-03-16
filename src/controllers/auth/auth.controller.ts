@@ -5,7 +5,7 @@ import { HttpStatus, SuccessMessages, ErrorMessages } from '../../constants';
 import logger from '../../logger';
 import { RegisterDto } from '../../dto/auth/register.dto';
 import { LoginDto } from '../../dto/auth/login.dto';
-
+// import logger from '../../logger';
 // Helper to get message from unknown error
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -46,7 +46,7 @@ export class AuthController {
 
       const data: LoginDto = req.body;
       const result = await this.authService.login(data);
-
+      // logger.info()
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

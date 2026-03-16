@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { IAdminService } from '../../services/interfaces/IAdminService';
+import { IDoctorService } from '../../services/interfaces/IDoctorService';
 import { HttpStatus, SuccessMessages, ErrorMessages } from '../../constants';
-
+import logger from '../../logger';
+import { verifyDoctorSchema } from '../../utils/doctor.validator';
 
 
 
@@ -10,7 +12,10 @@ import { HttpStatus, SuccessMessages, ErrorMessages } from '../../constants';
 export class AdminController {
 
 
-    constructor(private readonly adminService: IAdminService) { }
+    constructor(
+        private readonly adminService: IAdminService,
+        private readonly doctorService: IDoctorService
+    ) { }
 
 
 
@@ -37,7 +42,8 @@ export class AdminController {
 
             const result = await this.adminService.adminLogin({ email, password });
 
-
+console.log("afaf",result)
+// logger.info(result)
 
             res.cookie('refreshToken', result.refreshToken, {
                 httpOnly: true,
@@ -186,6 +192,78 @@ export class AdminController {
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Unknown error occurred';
             res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message });
+        }
+    };
+
+    // Doctor Management
+    getDoctors = async (req: Request, res: Response) => {
+        try {
+            const page = parseInt(String(req.query.page)) || 1;
+            const limit = parseInt(String(req.query.limit)) || 10;
+            const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+            const isVerified = req.query.isVerified ? String(req.query.isVerified) === 'true' : undefined;
+            const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+
+            const result = await this.doctorService.getAllDoctors(page, limit, search, isVerified, status);
+            
+            res.status(HttpStatus.OK).json({
+                success: true,
+                data: result.doctors,
+                total: result.total,
+                page,
+                limit,
+            });
+        } catch (error: any) {
+            logger.error('Error fetching all doctors (Admin)', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
+
+    getDoctorById = async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            const profile: any = await this.doctorService.getDoctorById(String(id));
+            
+            console.log(`[AdminController] getDoctorById(${id}) result:`, {
+                id: profile?._id,
+                hasUserId: !!profile?.userId,
+                userIdIsObject: typeof profile?.userId === 'object',
+                userName: profile?.userId?.userName,
+                specialtyId: profile?.profile?.specialtyId,
+                specialtyName: profile?.profile?.specialtyId?.name
+            });
+
+            res.status(HttpStatus.OK).json({ success: true, data: profile });
+        } catch (error: any) {
+            logger.error('Error fetching doctor by id (Admin)', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
+
+    verifyDoctor = async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            
+            // Manual validation instead of middleware to keep routes clean
+            const validationResult = verifyDoctorSchema.safeParse(req.body);
+            if (!validationResult.success) {
+                res.status(HttpStatus.BAD_REQUEST).json({
+                    success: false,
+                    message: 'Validation failed',
+                    errors: validationResult.error.format()
+                });
+                return;
+            }
+
+            const updatedDoctor = await this.doctorService.verifyDoctor(String(id), req.body);
+            res.status(HttpStatus.OK).json({
+                success: true,
+                message: `Doctor ${req.body.isVerified ? 'verified' : 'rejected'} successfully`,
+                data: updatedDoctor,
+            });
+        } catch (error: any) {
+            logger.error('Error verifying doctor (Admin)', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
         }
     };
 }

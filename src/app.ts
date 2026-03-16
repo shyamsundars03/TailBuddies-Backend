@@ -10,6 +10,7 @@ import routes from './routes';
 import authRoutes from './routes/auth.routes';
 import adminRoutes from './routes/admin.routes';
 import userRoutes from './routes/user.routes';
+import doctorRoutes from './routes/doctor.routes';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/doctor', doctorRoutes);
 app.use('/api', routes);
 
 

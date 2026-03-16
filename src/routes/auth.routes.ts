@@ -14,6 +14,10 @@ router.post('/reset-password', authController.resetPassword);
 router.post('/refresh-token', authController.refresh);
 router.post('/logout', authController.logout);
 
+import { doctorController } from '../config/di';
+// Public specialties list for dropdowns
+router.get('/specialties', (req, res) => doctorController.getSpecialties(req, res));
+
 
 
 
