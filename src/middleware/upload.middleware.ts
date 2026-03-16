@@ -10,8 +10,8 @@ cloudinary.config({
     api_secret: env.cloudinaryApiSecret,
 });
 
-// Configure Storage
-const storage = new CloudinaryStorage({
+// Configure Storage for Profiles (Images)
+const profileStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
         folder: 'tailbuddies/profiles',
@@ -20,4 +20,22 @@ const storage = new CloudinaryStorage({
     } as any,
 });
 
-export const upload = multer({ storage: storage });
+// Configure Storage for Documents (PDFs)
+const documentStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'tailbuddies/documents',
+        allowed_formats: ['pdf', 'jpg', 'png', 'jpeg'],
+        resource_type: 'auto',
+    } as any,
+});
+
+export const upload = multer({ 
+    storage: profileStorage,
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB for profile pics
+});
+
+export const uploadDoc = multer({ 
+    storage: documentStorage,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB for documents
+});
