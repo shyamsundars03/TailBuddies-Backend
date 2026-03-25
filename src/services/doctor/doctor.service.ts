@@ -11,20 +11,26 @@ export class DoctorService implements IDoctorService {
     
     
     
+    private readonly _doctorRepository: IDoctorRepository;
+    private readonly _specialtyRepository: ISpecialtyRepository;
+
     constructor(
-        private readonly doctorRepository: IDoctorRepository,
-        private readonly specialtyRepository: ISpecialtyRepository
-    ) { }
+        doctorRepository: IDoctorRepository,
+        specialtyRepository: ISpecialtyRepository
+    ) {
+        this._doctorRepository = doctorRepository;
+        this._specialtyRepository = specialtyRepository;
+    }
 
 
 
 
     async getDoctorProfile(userId: string): Promise<IDoctor | null> {
-        return await this.doctorRepository.findByUserIdWithDetails(userId);
+        return await this._doctorRepository.findByUserIdWithDetails(userId);
     }
 
     async getDoctorById(doctorId: string): Promise<IDoctor | null> {
-        return await this.doctorRepository.findByIdWithDetails(doctorId);
+        return await this._doctorRepository.findByIdWithDetails(doctorId);
     }
 
 
@@ -36,11 +42,11 @@ export class DoctorService implements IDoctorService {
 
 
     async updateDoctorProfile(userId: string, data: UpdateDoctorProfileDto): Promise<IDoctor> {
-        let doctor = await this.doctorRepository.findByUserId(userId);
+        let doctor = await this._doctorRepository.findByUserId(userId);
 
         if (!doctor) {
             
-            doctor = await this.doctorRepository.create({ userId } as any);
+            doctor = await this._doctorRepository.create({ userId } as any);
         }
 
         
@@ -62,7 +68,7 @@ export class DoctorService implements IDoctorService {
             if (userData.gender) updateFields.gender = userData.gender;
             if (userData.phone) updateFields.phone = userData.phone;
             
-            await (this.doctorRepository as any).model.db.model('User').findByIdAndUpdate(doctor.userId, updateFields);
+            await (this._doctorRepository as any)._model.db.model('User').findByIdAndUpdate(doctor.userId, updateFields);
             // console.log(`[DoctorService] Synchronized user fields for ${userId}:`, updateFields);
         }
 
@@ -179,7 +185,7 @@ export class DoctorService implements IDoctorService {
     async verifyDoctor(doctorId: string, data: VerifyDoctorDto): Promise<IDoctor> {
         
         
-        const doctor = await this.doctorRepository.findById(doctorId);
+        const doctor = await this._doctorRepository.findById(doctorId);
         
         
         
@@ -318,7 +324,7 @@ export class DoctorService implements IDoctorService {
    
         if (search) {
             
-            const matchingUsers = await (this.doctorRepository as any).model.db.model('User').find({
+            const matchingUsers = await (this._doctorRepository as any)._model.db.model('User').find({
                 userName: { $regex: search, $options: 'i' }
             }).select('_id');
 
@@ -340,7 +346,7 @@ export class DoctorService implements IDoctorService {
 
 
         if (filters?.gender) {
-            const genderUsers = await (this.doctorRepository as any).model.db.model('User').find({
+            const genderUsers = await (this._doctorRepository as any)._model.db.model('User').find({
                 gender: { $regex: `^${filters.gender}$`, $options: 'i' }
             }).select('_id');
             const genderUserIds = genderUsers.map((u: any) => u._id);
@@ -366,15 +372,15 @@ export class DoctorService implements IDoctorService {
             sort: { createdAt: -1 }
         };
 
-        const doctors = await (this.doctorRepository as any).model.find(filter, null, options)
+        const doctors = await (this._doctorRepository as any)._model.find(filter, null, options)
             .populate({ path: 'userId', select: 'userName email profilePic gender phone', model: 'User' })
             .populate({ path: 'profile.specialtyId', model: 'Specialty' });
-        const total = await (this.doctorRepository as any).model.countDocuments(filter);
+        const total = await (this._doctorRepository as any)._model.countDocuments(filter);
 
         return { doctors, total };
     }
 
     async getSpecialties(): Promise<any[]> {
-        return await this.specialtyRepository.findAll({ status: 'active' });
+        return await this._specialtyRepository.findAll({ status: 'active' });
     }
 }

@@ -4,7 +4,11 @@ import { HttpStatus } from '../../constants';
 import logger from '../../logger';
 
 export class AdminPetController {
-    constructor(private readonly petService: IPetService) {}
+    private readonly _petService: IPetService;
+
+    constructor(petService: IPetService) {
+        this._petService = petService;
+    }
 
 
 
@@ -21,7 +25,7 @@ export class AdminPetController {
             const limit = parseInt(req.query.limit as string || '10');
             const search = req.query.search ? (req.query.search as string) : undefined;
 
-            const result = await this.petService.getAllPets(page, limit, search);
+            const result = await this._petService.getAllPets(page, limit, search);
             res.status(HttpStatus.OK).json({ success: true, data: result });
         } catch (error: any) {
             logger.error('Error fetching all pets (Admin)', { error: error.message });
@@ -46,7 +50,7 @@ export class AdminPetController {
     getPetById = async (req: Request, res: Response): Promise<void> => {
         try {
             const id = req.params.id as string;
-            const pet = await this.petService.getPetById(id);
+            const pet = await this._petService.getPetById(id);
             res.status(HttpStatus.OK).json({ success: true, data: pet });
         } catch (error: any) {
             logger.error('Error fetching pet by id (Admin)', { error: error.message });

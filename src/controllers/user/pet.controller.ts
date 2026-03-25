@@ -8,7 +8,11 @@ export class UserPetController {
 
 
 
-    constructor(private readonly petService: IPetService) {}
+    private readonly _petService: IPetService;
+
+    constructor(petService: IPetService) {
+        this._petService = petService;
+    }
 
 
 
@@ -43,7 +47,7 @@ export class UserPetController {
                 });
             }
 
-            const pet = await this.petService.addPet(userId, bodyData);
+            const pet = await this._petService.addPet(userId, bodyData);
             
             
             
@@ -77,7 +81,7 @@ export class UserPetController {
             const limit = parseInt(req.query.limit as string) || 5;
             const search = req.query.search as string | undefined;
 
-            const result = await this.petService.getOwnerPets(userId, page, limit, search);
+            const result = await this._petService.getOwnerPets(userId, page, limit, search);
             
             res.status(HttpStatus.OK).json({ success: true, data: result });
         
@@ -102,7 +106,7 @@ export class UserPetController {
                 return;
             }
 
-            const pet = await this.petService.getPetById(id);
+            const pet = await this._petService.getPetById(id);
             if (pet.ownerId._id.toString() !== userId) {
                 res.status(HttpStatus.FORBIDDEN).json({ success: false, message: 'Forbidden' });
                 return;
@@ -149,7 +153,7 @@ export class UserPetController {
                 });
             }
 
-            const pet = await this.petService.updatePet(id, userId, bodyData);
+            const pet = await this._petService.updatePet(id, userId, bodyData);
             res.status(HttpStatus.OK).json({ success: true, data: pet, message: 'Pet updated successfully' });
         } catch (error: any) {
             logger.error('Error updating pet', { error: error.message });
@@ -182,7 +186,7 @@ export class UserPetController {
                 return;
             }
 
-            const pet = await this.petService.toggleActiveStatus(id, userId, isActive);
+            const pet = await this._petService.toggleActiveStatus(id, userId, isActive);
             res.status(HttpStatus.OK).json({ success: true, data: pet, message: 'Pet status updated successfully' });
         } catch (error: any) {
             logger.error('Error toggling pet status', { error: error.message });
@@ -212,7 +216,7 @@ export class UserPetController {
                 return;
             }
 
-            await this.petService.deletePet(id, userId);
+            await this._petService.deletePet(id, userId);
             res.status(HttpStatus.OK).json({ success: true, message: 'Pet deleted successfully' });
         } catch (error: any) {
             logger.error('Error deleting pet', { error: error.message });

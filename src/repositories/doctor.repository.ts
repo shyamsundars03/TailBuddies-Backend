@@ -14,11 +14,11 @@ export class DoctorRepository extends BaseRepository<IDoctor> implements IDoctor
 
 
     async findByUserId(userId: string): Promise<IDoctor | null> {
-        return await this.model.findOne({ userId }).populate('userId');
+        return await this._model.findOne({ userId }).populate('userId');
     }
 
     async findAll(filter: any = {}, options: any = {}): Promise<IDoctor[]> {
-        return await this.model.find(filter, null, options).populate('userId') as any;
+        return await this._model.find(filter, null, options).populate('userId') as any;
     }
 
 
@@ -28,7 +28,7 @@ export class DoctorRepository extends BaseRepository<IDoctor> implements IDoctor
 
 
     async findByUserIdWithDetails(userId: string): Promise<IDoctor | null> {
-        return await this.model.findOne({ userId })
+        return await this._model.findOne({ userId })
             .populate({ path: 'userId', select: 'userName email gender phone profilePic isBlocked', model: 'User' })
             .populate({ path: 'profile.specialtyId', model: 'Specialty' });
     }
@@ -41,7 +41,7 @@ export class DoctorRepository extends BaseRepository<IDoctor> implements IDoctor
 
 
     async findByIdWithDetails(doctorId: string): Promise<IDoctor | null> {
-        return await this.model.findById(doctorId)
+        return await this._model.findById(doctorId)
             .populate({ path: 'userId', select: 'userName email gender phone profilePic isBlocked', model: 'User' })
             .populate({ path: 'profile.specialtyId', model: 'Specialty' });
     }

@@ -8,7 +8,11 @@ export class DoctorController {
 
 
 
-    constructor(private readonly doctorService: IDoctorService) { }
+    private readonly _doctorService: IDoctorService;
+
+    constructor(doctorService: IDoctorService) {
+        this._doctorService = doctorService;
+    }
 
 
 
@@ -19,7 +23,7 @@ export class DoctorController {
     getProfile = async (req: Request, res: Response) => {
         try {
             const userId = (req as any).user.userId;
-            const profile = await this.doctorService.getDoctorProfile(userId);
+            const profile = await this._doctorService.getDoctorProfile(userId);
 
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -45,7 +49,7 @@ export class DoctorController {
     getById = async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
-            const profile: any = await this.doctorService.getDoctorById(String(id));
+            const profile: any = await this._doctorService.getDoctorById(String(id));
 
             // console.log(`[DoctorController] Fetched doctor ${id} for Admin. Population check:`, {
             //     hasUserId: !!profile?.userId,
@@ -81,7 +85,7 @@ export class DoctorController {
     updateProfile = async (req: Request, res: Response) => {
         try {
             const userId = (req as any).user.userId;
-            const updatedProfile = await this.doctorService.updateDoctorProfile(userId, req.body);
+            const updatedProfile = await this._doctorService.updateDoctorProfile(userId, req.body);
 
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -113,7 +117,7 @@ export class DoctorController {
             const { id } = req.params;
             const { isVerified } = req.body;
             logger.info(`[DoctorController] Attempting to ${isVerified ? 'verify' : 'reject'} doctor with id: ${id}`);
-            const updatedDoctor = await this.doctorService.verifyDoctor(String(id), req.body);
+            const updatedDoctor = await this._doctorService.verifyDoctor(String(id), req.body);
 
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -163,7 +167,7 @@ export class DoctorController {
             };
 
             logger.info(`[DoctorController] Fetching doctors: page=${page}, limit=${limit}, search=${search}, isVerified=${isVerified}`);
-            const result = await this.doctorService.getAllDoctors(page, limit, search, isVerified, status, filters);
+            const result = await this._doctorService.getAllDoctors(page, limit, search, isVerified, status, filters);
 
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -201,7 +205,7 @@ export class DoctorController {
             const userId = (req as any).user.userId;
             console.log(`[DoctorController] Received verification request for user: ${userId}`);
             logger.info(`[DoctorController] Attempting to request verification for doctor with userId: ${userId}`);
-            const updatedDoctor = await this.doctorService.requestVerification(userId);
+            const updatedDoctor = await this._doctorService.requestVerification(userId);
 
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -234,7 +238,7 @@ export class DoctorController {
     getSpecialties = async (req: Request, res: Response) => {
         try {
             console.log(`[DoctorController] Fetching specialties for user: ${(req as any).user?.userId}`);
-            const specialties = await this.doctorService.getSpecialties();
+            const specialties = await this._doctorService.getSpecialties();
             console.log(`[DoctorController] Found ${specialties.length} specialties`);
             res.status(HttpStatus.OK).json({
                 success: true,

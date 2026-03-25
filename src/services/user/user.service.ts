@@ -12,11 +12,19 @@ export class UserService implements IUserService {
     
     
     
+    private readonly _userRepository: IUserRepository;
+    private readonly _otpRepository: IOtpRepository;
+    private readonly _emailService: IEmailService;
+
     constructor(
-        private readonly userRepository: IUserRepository,
-        private readonly otpRepository: IOtpRepository,
-        private readonly emailService: IEmailService
-    ) { }
+        userRepository: IUserRepository,
+        otpRepository: IOtpRepository,
+        emailService: IEmailService
+    ) {
+        this._userRepository = userRepository;
+        this._otpRepository = otpRepository;
+        this._emailService = emailService;
+    }
 
 
 
@@ -26,7 +34,7 @@ export class UserService implements IUserService {
     }
 
     async getUserProfile(userId: string): Promise<IUser> {
-        const user = await this.userRepository.findById(userId);
+        const user = await this._userRepository.findById(userId);
         if (!user) {
             throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
@@ -42,7 +50,7 @@ export class UserService implements IUserService {
 
 
     async updateUserProfile(userId: string, data: Partial<IUser>): Promise<IUser> {
-        const user = await this.userRepository.findById(userId);
+        const user = await this._userRepository.findById(userId);
         if (!user) {
             throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
@@ -67,7 +75,7 @@ export class UserService implements IUserService {
 
 
     async updateProfilePic(userId: string, profilePic: string): Promise<IUser> {
-        const user = await this.userRepository.findById(userId);
+        const user = await this._userRepository.findById(userId);
         if (!user) {
             throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
@@ -90,16 +98,16 @@ export class UserService implements IUserService {
 
 
     async initiateEmailChange(userId: string): Promise<void> {
-        const user = await this.userRepository.findById(userId);
+        const user = await this._userRepository.findById(userId);
         if (!user) {
             throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
 
         const otp = this.generateOtp();
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
-        await this.otpRepository.createOtp(user.email, otp, expiresAt);
+        await this._otpRepository.createOtp(user.email, otp, expiresAt);
 
-        await this.emailService.sendOTP(user.email, otp);
+        await this._emailService.sendOTP(user.email, otp);
         logger.info('Email change OTP sent to current email', { email: user.email });
     }
 
@@ -120,17 +128,17 @@ export class UserService implements IUserService {
 
 
     async verifyCurrentEmail(userId: string, otp: string): Promise<void> {
-        const user = await this.userRepository.findById(userId);
+        const user = await this._userRepository.findById(userId);
         if (!user) {
             throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
 
-        const otpDoc = await this.otpRepository.findOtp(user.email);
+        const otpDoc = await this._otpRepository.findOtp(user.email);
         if (!otpDoc || otpDoc.otp !== otp) {
             throw new AppError(ErrorMessages.INVALID_OTP, HttpStatus.BAD_REQUEST);
         }
 
-        await this.otpRepository.deleteOtp(user.email);
+        await this._otpRepository.deleteOtp(user.email);
         logger.info('Current email verified for change', { userId });
     }
 
@@ -146,9 +154,9 @@ export class UserService implements IUserService {
     async sendOtpToNewEmail(userId: string, newEmail: string): Promise<void> {
         const otp = this.generateOtp();
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-        await this.otpRepository.createOtp(newEmail, otp, expiresAt);
+        await this._otpRepository.createOtp(newEmail, otp, expiresAt);
 
-        await this.emailService.sendOTP(newEmail, otp);
+        await this._emailService.sendOTP(newEmail, otp);
         logger.info('Email change OTP sent to new email', { newEmail });
     }
 
@@ -166,12 +174,12 @@ export class UserService implements IUserService {
 
 
     async verifyNewEmail(userId: string, newEmail: string, otp: string): Promise<IUser> {
-        const user = await this.userRepository.findById(userId);
+        const user = await this._userRepository.findById(userId);
         if (!user) {
             throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
 
-        const otpDoc = await this.otpRepository.findOtp(newEmail);
+        const otpDoc = await this._otpRepository.findOtp(newEmail);
         if (!otpDoc || otpDoc.otp !== otp) {
             throw new AppError(ErrorMessages.INVALID_OTP, HttpStatus.BAD_REQUEST);
         }
@@ -180,7 +188,7 @@ export class UserService implements IUserService {
         user.email = newEmail.toLowerCase();
         await user.save();
 
-        await this.otpRepository.deleteOtp(newEmail);
+        await this._otpRepository.deleteOtp(newEmail);
         logger.info('Email changed successfully', { userId, newEmail });
 
         return user;

@@ -13,10 +13,16 @@ import { env } from '../../config/env';
 export class AdminController {
 
 
+    private readonly _adminService: IAdminService;
+    private readonly _doctorService: IDoctorService;
+
     constructor(
-        private readonly adminService: IAdminService,
-        private readonly doctorService: IDoctorService
-    ) { }
+        adminService: IAdminService,
+        doctorService: IDoctorService
+    ) {
+        this._adminService = adminService;
+        this._doctorService = doctorService;
+    }
 
 
 
@@ -41,7 +47,7 @@ export class AdminController {
 
 
 
-            const result = await this.adminService.adminLogin({ email, password });
+            const result = await this._adminService.adminLogin({ email, password });
 
 console.log("afaf",result)
 // logger.info(result)
@@ -88,7 +94,7 @@ console.log("afaf",result)
 
     createSpecialty = async (req: Request, res: Response): Promise<void> => {
         try {
-            const specialty = await this.adminService.createSpecialty(req.body);
+            const specialty = await this._adminService.createSpecialty(req.body);
             res.status(HttpStatus.CREATED).json({ success: true, data: specialty });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -109,7 +115,7 @@ console.log("afaf",result)
             const page = parseInt(String(req.query.page || '1'));
             const limit = parseInt(String(req.query.limit || '10'));
             const search = req.query.search ? String(req.query.search) : undefined;
-            const result = await this.adminService.getSpecialties(page, limit, search);
+            const result = await this._adminService.getSpecialties(page, limit, search);
             res.status(HttpStatus.OK).json({ success: true, data: result });
 
 
@@ -128,7 +134,7 @@ console.log("afaf",result)
         try {
 
             const id = String(req.params.id);
-            const specialty = await this.adminService.updateSpecialty(id, req.body);
+            const specialty = await this._adminService.updateSpecialty(id, req.body);
             res.status(HttpStatus.OK).json({ success: true, data: specialty });
 
 
@@ -143,7 +149,7 @@ console.log("afaf",result)
     deleteSpecialty = async (req: Request, res: Response): Promise<void> => {
         try {
             const id = String(req.params.id);
-            await this.adminService.deleteSpecialty(id);
+            await this._adminService.deleteSpecialty(id);
             res.status(HttpStatus.OK).json({ success: true, message: 'Specialty deleted' });
 
 
@@ -167,7 +173,7 @@ console.log("afaf",result)
             const limit = parseInt(String(req.query.limit || '10'));
             const role = req.query.role ? String(req.query.role) : undefined;
             const search = req.query.search ? String(req.query.search) : undefined;
-            const result = await this.adminService.getUsers(page, limit, role, search);
+            const result = await this._adminService.getUsers(page, limit, role, search);
             res.status(HttpStatus.OK).json({ success: true, data: result });
 
 
@@ -185,7 +191,7 @@ console.log("afaf",result)
         try {
 
             const id = String(req.params.id);
-            const user = await this.adminService.toggleUserBlock(id);
+            const user = await this._adminService.toggleUserBlock(id);
             res.status(HttpStatus.OK).json({ success: true, data: user });
 
 
@@ -211,7 +217,7 @@ console.log("afaf",result)
             const isVerified = req.query.isVerified ? String(req.query.isVerified) === 'true' : undefined;
             const status = typeof req.query.status === 'string' ? req.query.status : undefined;
 
-            const result = await this.doctorService.getAllDoctors(page, limit, search, isVerified, status);
+            const result = await this._doctorService.getAllDoctors(page, limit, search, isVerified, status);
             
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -238,7 +244,7 @@ console.log("afaf",result)
     getDoctorById = async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
-            const profile: any = await this.doctorService.getDoctorById(String(id));
+            const profile: any = await this._doctorService.getDoctorById(String(id));
             
             // console.log(`[AdminController] getDoctorById(${id}) result:`, {
             //     id: profile?._id,
@@ -281,7 +287,7 @@ console.log("afaf",result)
                 return;
             }
 
-            const updatedDoctor = await this.doctorService.verifyDoctor(String(id), req.body);
+            const updatedDoctor = await this._doctorService.verifyDoctor(String(id), req.body);
             res.status(HttpStatus.OK).json({
                 success: true,
                 message: `Doctor ${req.body.isVerified ? 'verified' : 'rejected'} successfully`,

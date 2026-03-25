@@ -14,12 +14,16 @@ function getErrorMessage(error: unknown): string {
 }
 
 export class AuthController {
-  constructor(private readonly authService: IAuthService) { }
+  private readonly _authService: IAuthService;
+
+  constructor(authService: IAuthService) {
+    this._authService = authService;
+  }
 
   login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const data: LoginDto = req.body;
-      const result = await this.authService.login(data);
+      const result = await this._authService.login(data);
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -59,7 +63,7 @@ export class AuthController {
     try {
       const data: RegisterDto = req.body;
       logger.info('Registration request received', { email: data.email });
-      const user = await this.authService.register(data);
+      const user = await this._authService.register(data);
       res.status(HttpStatus.CREATED).json({
         success: true,
         message: SuccessMessages.OTP_SENT,
@@ -77,7 +81,7 @@ export class AuthController {
   googleLogin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { idToken, role } = req.body;
-      const result = await this.authService.googleLogin(idToken, role);
+      const result = await this._authService.googleLogin(idToken, role);
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -109,7 +113,7 @@ export class AuthController {
   verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email, otp, userData, purpose } = req.body;
-      const result = await this.authService.verifyOtp(email, otp, userData, purpose);
+      const result = await this._authService.verifyOtp(email, otp, userData, purpose);
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -141,7 +145,7 @@ export class AuthController {
   resendOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email } = req.body;
-      await this.authService.resendOtp(email);
+      await this._authService.resendOtp(email);
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.OTP_SENT,
@@ -154,7 +158,7 @@ export class AuthController {
   forgotPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email } = req.body;
-      await this.authService.forgotPassword(email);
+      await this._authService.forgotPassword(email);
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.PASSWORD_RESET_OTP_SENT,
@@ -171,7 +175,7 @@ export class AuthController {
   resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email, otp, newPassword } = req.body;
-      await this.authService.resetPassword(email, otp, newPassword);
+      await this._authService.resetPassword(email, otp, newPassword);
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.PASSWORD_RESET,
@@ -188,7 +192,7 @@ export class AuthController {
       if (!userId) {
         return next(new AppError(ErrorMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED));
       }
-      await this.authService.changePassword(userId, currentPassword, newPassword);
+      await this._authService.changePassword(userId, currentPassword, newPassword);
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.PASSWORD_CHANGED,
@@ -204,7 +208,7 @@ export class AuthController {
       if (!refreshToken) {
         return next(new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED));
       }
-      const result = await this.authService.refreshAccessToken(refreshToken);
+      const result = await this._authService.refreshAccessToken(refreshToken);
       res.status(HttpStatus.OK).json({
         success: true,
         data: { accessToken: result.accessToken },

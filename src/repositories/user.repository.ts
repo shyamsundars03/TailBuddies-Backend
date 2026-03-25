@@ -28,6 +28,6 @@ export class UserRepository extends BaseRepository<IUser> implements IUserReposi
 
   
   async findUserWithPassword(email: string): Promise<IUser | null> {
-    return await this.model.findOne({ email: email.toLowerCase() }).select('+password');
+    return await this._model.findOne({ email: email.toLowerCase() }).select('+password');
   }
 }
