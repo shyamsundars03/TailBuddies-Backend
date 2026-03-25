@@ -4,6 +4,7 @@ import { IDoctorService } from '../../services/interfaces/IDoctorService';
 import { HttpStatus, SuccessMessages, ErrorMessages } from '../../constants';
 import logger from '../../logger';
 import { verifyDoctorSchema } from '../../utils/doctor.validator';
+import { env } from '../../config/env';
 
 
 
@@ -49,7 +50,7 @@ console.log("afaf",result)
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: 'strict',
-                maxAge: 7 * 24 * 60 * 60 * 1000, 
+                maxAge: env.jwtRefreshMaxAge,
             });
 
 
@@ -84,7 +85,7 @@ console.log("afaf",result)
 
 
 
-// Specialty Management
+
     createSpecialty = async (req: Request, res: Response): Promise<void> => {
         try {
             const specialty = await this.adminService.createSpecialty(req.body);
@@ -195,6 +196,12 @@ console.log("afaf",result)
         }
     };
 
+
+
+
+
+
+
     // Doctor Management
     getDoctors = async (req: Request, res: Response) => {
         try {
@@ -219,19 +226,28 @@ console.log("afaf",result)
         }
     };
 
+
+
+
+
+
+
+
+
+
     getDoctorById = async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
             const profile: any = await this.doctorService.getDoctorById(String(id));
             
-            console.log(`[AdminController] getDoctorById(${id}) result:`, {
-                id: profile?._id,
-                hasUserId: !!profile?.userId,
-                userIdIsObject: typeof profile?.userId === 'object',
-                userName: profile?.userId?.userName,
-                specialtyId: profile?.profile?.specialtyId,
-                specialtyName: profile?.profile?.specialtyId?.name
-            });
+            // console.log(`[AdminController] getDoctorById(${id}) result:`, {
+            //     id: profile?._id,
+            //     hasUserId: !!profile?.userId,
+            //     userIdIsObject: typeof profile?.userId === 'object',
+            //     userName: profile?.userId?.userName,
+            //     specialtyId: profile?.profile?.specialtyId,
+            //     specialtyName: profile?.profile?.specialtyId?.name
+            // });
 
             res.status(HttpStatus.OK).json({ success: true, data: profile });
         } catch (error: any) {
@@ -240,11 +256,21 @@ console.log("afaf",result)
         }
     };
 
+
+
+
+
+
+
+
+
+
+
     verifyDoctor = async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
             
-            // Manual validation instead of middleware to keep routes clean
+
             const validationResult = verifyDoctorSchema.safeParse(req.body);
             if (!validationResult.success) {
                 res.status(HttpStatus.BAD_REQUEST).json({
@@ -266,4 +292,11 @@ console.log("afaf",result)
             res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
         }
     };
+
+
+
+
+
+
+
 }

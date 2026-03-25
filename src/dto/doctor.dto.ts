@@ -48,6 +48,8 @@ export interface UpdateDoctorProfileDto {
         isWorking: boolean;
         slots: string[];
     }[];
+    appointmentDuration?: number;
+    isActive?: boolean;
 }
 
 export interface VerifyDoctorDto {

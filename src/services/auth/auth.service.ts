@@ -16,8 +16,8 @@ import logger from '../../logger';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { IUser } from '../../models/user.models';
-
+import { User, IUser } from '../../models/user.models';
+import Admin from '../../models/admin.model';
 
 
 
@@ -395,7 +395,7 @@ export class AuthService implements IAuthService {
     const user = await this.userRepository.findByEmail(email);
     if (!user) {
       logger.warn('Forgot password for non-existent email', { email });
-      return;
+      throw new Error(ErrorMessages.USER_NOT_FOUND);
     }
 
     await this.sendOtpToEmail(email);
@@ -493,16 +493,25 @@ export class AuthService implements IAuthService {
         throw new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
       }
 
-      const user = await this.userRepository.findById(decoded.userId);
+      let user = await this.userRepository.findById(decoded.userId);
+      let role = user?.role;
+
       if (!user) {
-        throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+        // Check if it's an admin
+        const admin = await Admin.findById(decoded.userId);
+        if (!admin) {
+          throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+        }
+        // Admin found
+        const accessToken = this.jwtService.generateAccessToken({ userId: admin.id, role: 'admin' });
+        return { accessToken };
       }
 
       if (user.isBlocked) {
         throw new AppError(ErrorMessages.ACCOUNT_BLOCKED, HttpStatus.FORBIDDEN);
       }
 
-      const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: user.role });
+      const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: role || 'user' });
       return { accessToken };
     } catch (error) {
       logger.error('Refresh Token Error:', error);

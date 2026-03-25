@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 
 const PORT = env.port;
 
-// Connect to database first, then start server
+
 const startServer = async () => {
   try {
     

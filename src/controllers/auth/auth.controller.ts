@@ -5,53 +5,26 @@ import { HttpStatus, SuccessMessages, ErrorMessages } from '../../constants';
 import logger from '../../logger';
 import { RegisterDto } from '../../dto/auth/register.dto';
 import { LoginDto } from '../../dto/auth/login.dto';
-// import logger from '../../logger';
-// Helper to get message from unknown error
+import { env } from '../../config/env';
+
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
 }
 
-// Helper for AppError instances
-function getErrorStatus(error: unknown): number | undefined {
-  if (typeof error === 'object' && error !== null && 'statusCode' in error) {
-    const statusCode = (error as { statusCode: unknown }).statusCode;
-    if (typeof statusCode === 'number') return statusCode;
-  }
-  return undefined;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
 export class AuthController {
-
-
-
-
   constructor(private readonly authService: IAuthService) { }
 
   login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-
-
       const data: LoginDto = req.body;
       const result = await this.authService.login(data);
-      // logger.info()
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: env.jwtRefreshMaxAge,
       });
 
       res.status(HttpStatus.OK).json({
@@ -70,7 +43,6 @@ export class AuthController {
           accessToken: result.accessToken,
         },
       });
-
     } catch (error: unknown) {
       const msg = getErrorMessage(error);
       if (msg === ErrorMessages.INVALID_CREDENTIALS) {
@@ -83,30 +55,11 @@ export class AuthController {
     }
   };
 
-
-
-
-
-
-
-
-
-
-
-
   register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const data: RegisterDto = req.body;
-
-      logger.info('Registration request received', {
-        email: data.email,
-        username: data.username
-      });
-
+      logger.info('Registration request received', { email: data.email });
       const user = await this.authService.register(data);
-
-      logger.info('Registration successful, OTP sent', { userId: user.id });
-
       res.status(HttpStatus.CREATED).json({
         success: true,
         message: SuccessMessages.OTP_SENT,
@@ -114,40 +67,22 @@ export class AuthController {
       });
     } catch (error: unknown) {
       const msg = getErrorMessage(error);
-      if (
-        msg === ErrorMessages.EMAIL_EXISTS ||
-        msg === ErrorMessages.PHONE_EXISTS ||
-        msg.includes('Account already exists')
-      ) {
+      if (msg === ErrorMessages.EMAIL_EXISTS || msg === ErrorMessages.PHONE_EXISTS) {
         return next(new AppError(msg, HttpStatus.CONFLICT));
       }
       next(error);
     }
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
   googleLogin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { idToken, role } = req.body;
       const result = await this.authService.googleLogin(idToken, role);
-
-
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: env.jwtRefreshMaxAge,
       });
 
       res.status(HttpStatus.OK).json({
@@ -167,37 +102,19 @@ export class AuthController {
         },
       });
     } catch (error: unknown) {
-      const msg = getErrorMessage(error);
-      if (msg?.includes('Account already exists')) {
-        return next(new AppError(msg, HttpStatus.CONFLICT));
-      }
       next(error);
     }
   };
-
-
-
-
-
-
-
-
-
-
-
-
 
   verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email, otp, userData, purpose } = req.body;
       const result = await this.authService.verifyOtp(email, otp, userData, purpose);
-
-
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: env.jwtRefreshMaxAge,
       });
 
       res.status(HttpStatus.OK).json({
@@ -221,29 +138,10 @@ export class AuthController {
     }
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
   resendOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email } = req.body;
-
-      if (!email) {
-        return next(new AppError(ErrorMessages.REQUIRED_FIELD, HttpStatus.BAD_REQUEST));
-      }
-
       await this.authService.resendOtp(email);
-
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.OTP_SENT,
@@ -253,66 +151,27 @@ export class AuthController {
     }
   };
 
-
-
-
-
-
-
-
-
-
-
-
   forgotPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email } = req.body;
-
-      if (!email) {
-        return next(new AppError(ErrorMessages.REQUIRED_FIELD, HttpStatus.BAD_REQUEST));
-      }
-
       await this.authService.forgotPassword(email);
-
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.PASSWORD_RESET_OTP_SENT,
       });
     } catch (error: unknown) {
-
-      const statusCode = getErrorStatus(error);
-      if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
-        return next(error);
+      const msg = getErrorMessage(error);
+      if (msg === ErrorMessages.USER_NOT_FOUND) {
+        return next(new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND));
       }
-      res.status(HttpStatus.OK).json({
-        success: true,
-        message: SuccessMessages.PASSWORD_RESET_OTP_SENT,
-      });
+      next(error);
     }
   };
-
-
-
-
-
-
-
-
-
-
-
-
 
   resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email, otp, newPassword } = req.body;
-
-      if (!email || !otp || !newPassword) {
-        return next(new AppError(ErrorMessages.REQUIRED_FIELD, HttpStatus.BAD_REQUEST));
-      }
-
       await this.authService.resetPassword(email, otp, newPassword);
-
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.PASSWORD_RESET,
@@ -322,29 +181,14 @@ export class AuthController {
     }
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
   changePassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = (req as Request & { user?: { userId: string } }).user?.userId;
       const { currentPassword, newPassword } = req.body;
-
-      if (!userId || !currentPassword || !newPassword) {
-        return next(new AppError(ErrorMessages.REQUIRED_FIELD, HttpStatus.BAD_REQUEST));
+      if (!userId) {
+        return next(new AppError(ErrorMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED));
       }
-
       await this.authService.changePassword(userId, currentPassword, newPassword);
-
       res.status(HttpStatus.OK).json({
         success: true,
         message: SuccessMessages.PASSWORD_CHANGED,
@@ -358,23 +202,14 @@ export class AuthController {
     try {
       const refreshToken = req.cookies?.refreshToken;
       if (!refreshToken) {
-        logger.warn('Refresh token missing in cookies', { path: req.path });
         return next(new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED));
       }
-
       const result = await this.authService.refreshAccessToken(refreshToken);
-
       res.status(HttpStatus.OK).json({
         success: true,
-        data: {
-          accessToken: result.accessToken,
-        },
+        data: { accessToken: result.accessToken },
       });
     } catch (error: unknown) {
-
-      // If refresh token is invalid/expired, clear the cookie
-
-
       res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -391,22 +226,12 @@ export class AuthController {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
       });
-
       res.status(HttpStatus.OK).json({
         success: true,
-        message: SuccessMessages.LOGOUT || 'Logged out successfully',
+        message: SuccessMessages.LOGOUT,
       });
     } catch (error: unknown) {
       next(error);
     }
   };
-
-
-
-
-
-
-
-
-
 }

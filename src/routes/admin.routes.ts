@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction, RequestHandler } from 'express';
-import { adminController } from '../config/di';
+import { adminController, adminPetController } from '../config/di';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '../enums/user-role.enum';
 import { AppError } from '../errors/app-error';
@@ -7,7 +7,7 @@ import { HttpStatus, ErrorMessages } from '../constants';
 
 const router = Router();
 
-// Simple role check middleware
+
 const adminOnly = (req: AuthRequest, res: Response, next: NextFunction) => {
     if (req.user?.role !== UserRole.ADMIN) {
         return next(new AppError(ErrorMessages.FORBIDDEN || 'Access Denied', HttpStatus.FORBIDDEN));
@@ -36,5 +36,9 @@ router.get('/doctors', adminController.getDoctors);
 router.get('/doctors/:id', adminController.getDoctorById);
 router.patch('/doctors/:id/verify', adminController.verifyDoctor);
 router.patch('/doctors/:id/reject', (req, res) => adminController.verifyDoctor(req, res)); // Re-using verifyDoctor but it handles rejection now
+
+// Pet Management (Admin)
+router.get('/pets', adminPetController.getAllPets);
+router.get('/pets/:id', adminPetController.getPetById);
 
 export default router;

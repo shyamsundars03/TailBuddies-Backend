@@ -10,7 +10,7 @@ cloudinary.config({
     api_secret: env.cloudinaryApiSecret,
 });
 
-// Configure Storage for Profiles (Images)
+// Configure (Images)
 const profileStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
@@ -20,7 +20,7 @@ const profileStorage = new CloudinaryStorage({
     } as any,
 });
 
-// Configure Storage for Documents (PDFs)
+// Configure (PDFs)
 const documentStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
@@ -32,10 +32,10 @@ const documentStorage = new CloudinaryStorage({
 
 export const upload = multer({ 
     storage: profileStorage,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB for profile pics
+    limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
 export const uploadDoc = multer({ 
     storage: documentStorage,
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB for documents
+    limits: { fileSize: 10 * 1024 * 1024 } 
 });
