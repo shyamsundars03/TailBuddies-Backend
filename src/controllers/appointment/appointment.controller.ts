@@ -10,7 +10,11 @@ export class AppointmentController {
 
 
 
-    constructor(private readonly appointmentService: IAppointmentService) { }
+    private readonly _appointmentService: IAppointmentService;
+
+    constructor(appointmentService: IAppointmentService) {
+        this._appointmentService = appointmentService;
+    }
 
 
 
@@ -25,7 +29,7 @@ export class AppointmentController {
                 res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
                 return;
             }
-            const result = await this.appointmentService.createAppointment({
+            const result = await this._appointmentService.createAppointment({
                 ...req.body,
                 ownerId: userId
             });
@@ -61,7 +65,7 @@ export class AppointmentController {
             const search = req.query.search as string;
             const status = req.query.status as string;
 
-            const result = await this.appointmentService.getAppointmentsByOwner(userId, page, limit, search, status);
+            const result = await this._appointmentService.getAppointmentsByOwner(userId, page, limit, search, status);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;
@@ -96,7 +100,7 @@ export class AppointmentController {
             const limit = parseInt(req.query.limit as string) || 10;
             const search = req.query.search as string;
 
-            const result = await this.appointmentService.getAppointmentsByDoctor(
+            const result = await this._appointmentService.getAppointmentsByDoctor(
                 userId,
                 status as string | undefined,
                 page,
@@ -143,9 +147,9 @@ export class AppointmentController {
 
             let result;
             if (status === AppointmentStatus.CANCELLED) {
-                result = await this.appointmentService.cancelAppointment(id, userId, reason || 'Cancelled by Doctor');
+                result = await this._appointmentService.cancelAppointment(id, userId, reason || 'Cancelled by Doctor');
             } else {
-                result = await this.appointmentService.updateAppointmentStatus(
+                result = await this._appointmentService.updateAppointmentStatus(
                     id,
                     status as AppointmentStatus,
                     userId
@@ -181,7 +185,7 @@ export class AppointmentController {
             const limit = parseInt(req.query.limit as string) || 10;
             const search = req.query.search as string;
 
-            const result = await this.appointmentService.getAllAppointments(page, limit, search);
+            const result = await this._appointmentService.getAllAppointments(page, limit, search);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;
@@ -213,7 +217,7 @@ export class AppointmentController {
             }
             const id = req.params.id as string;
             const { reason } = req.body;
-            const result = await this.appointmentService.cancelAppointment(id, userId, reason);
+            const result = await this._appointmentService.cancelAppointment(id, userId, reason);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;
@@ -240,7 +244,7 @@ export class AppointmentController {
         logger.info('AppointmentController.getAvailableSlots hit', { query: req.query });
         try {
             const { doctorId, date } = req.query;
-            const result = await this.appointmentService.getAvailableSlots(
+            const result = await this._appointmentService.getAvailableSlots(
                 doctorId as string,
                 new Date(date as string)
             );
@@ -272,7 +276,7 @@ export class AppointmentController {
         logger.info('AppointmentController.getById hit', { id: req.params.id });
         try {
             const id = req.params.id as string;
-            const result = await this.appointmentService.getAppointmentById(id);
+            const result = await this._appointmentService.getAppointmentById(id);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;
@@ -296,7 +300,7 @@ export class AppointmentController {
         try {
             const id = req.params.id as string;
             const role = req.body.role as 'owner' | 'doctor';
-            const result = await this.appointmentService.checkIn(id, role);
+            const result = await this._appointmentService.checkIn(id, role);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;
@@ -321,7 +325,7 @@ export class AppointmentController {
         try {
             const id = req.params.id as string;
             const role = req.body.role as 'owner' | 'doctor';
-            const result = await this.appointmentService.checkOut(id, role);
+            const result = await this._appointmentService.checkOut(id, role);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;
@@ -343,7 +347,7 @@ export class AppointmentController {
             const limit = parseInt(req.query.limit as string) || 10;
             const search = req.query.search as string;
 
-            const result = await this.appointmentService.getPatientsByDoctor(userId, page, limit, search);
+            const result = await this._appointmentService.getPatientsByDoctor(userId, page, limit, search);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;

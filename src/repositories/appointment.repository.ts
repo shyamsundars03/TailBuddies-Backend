@@ -12,7 +12,7 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
   }
 
   async findWithDetails(query: any): Promise<IAppointment[]> {
-    return await this.model.find(query)
+    return await this._model.find(query)
       .populate('ownerId', 'userName email phone')
       .populate({
         path: 'doctorId',
@@ -32,7 +32,7 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
   async findWithPagination(query: any, page: number, limit: number): Promise<{ appointments: IAppointment[], total: number }> {
     const skip = (page - 1) * limit;
     const [appointments, total] = await Promise.all([
-      this.model.find(query)
+      this._model.find(query)
         .populate('ownerId', 'userName email phone')
         .populate({
           path: 'doctorId',
@@ -45,7 +45,7 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
         .sort({ appointmentDate: -1, appointmentStartTime: -1 })
         .skip(skip)
         .limit(limit),
-      this.model.countDocuments(query)
+      this._model.countDocuments(query)
     ]);
 
     return { appointments, total };

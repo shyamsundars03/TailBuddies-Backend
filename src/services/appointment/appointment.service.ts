@@ -10,17 +10,25 @@ import mongoose from 'mongoose';
 
 export class AppointmentService implements IAppointmentService {
     
+    private readonly _appointmentRepository: IAppointmentRepository;
+    private readonly _doctorRepository: IDoctorRepository;
+    private readonly _petRepository: IPetRepository;
+
     constructor(
-        private readonly appointmentRepository: IAppointmentRepository,
-        private readonly doctorRepository: IDoctorRepository,
-        private readonly petRepository: IPetRepository
-    ) {}
+        appointmentRepository: IAppointmentRepository,
+        doctorRepository: IDoctorRepository,
+        petRepository: IPetRepository
+    ) {
+        this._appointmentRepository = appointmentRepository;
+        this._doctorRepository = doctorRepository;
+        this._petRepository = petRepository;
+    }
 
     async createAppointment(data: any): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
         const session = await mongoose.startSession();
         session.startTransaction();
         try {
-            const doctor = await this.doctorRepository.findByIdWithDetails(data.doctorId);
+            const doctor = await this._doctorRepository.findByIdWithDetails(data.doctorId);
             if (!doctor) throw new Error('Doctor not found');
 
             if (!doctor.isActive || !doctor.isVerified || doctor.profileStatus !== 'verified') {
@@ -32,7 +40,7 @@ export class AppointmentService implements IAppointmentService {
                 throw new Error('Doctor is currently unavailable');
             }
 
-            const pet = await this.petRepository.findById(data.petId);
+            const pet = await this._petRepository.findById(data.petId);
             if (!pet) throw new Error('Pet not found');
             if (!pet.isActive) {
                 throw new Error('Pet is not active');
@@ -46,7 +54,7 @@ export class AppointmentService implements IAppointmentService {
             const randomDigits = Math.floor(10000 + Math.random() * 90000).toString();
             const appointmentId = `API${randomDigits}`;
 
-            const appointment = await this.appointmentRepository.create({
+            const appointment = await this._appointmentRepository.create({
                 ...data,
                 appointmentId,
                 status: AppointmentStatus.BOOKED
@@ -75,7 +83,7 @@ export class AppointmentService implements IAppointmentService {
                     { 'serviceType': { $regex: search, $options: 'i' } }
                 ];
             }
-            const { appointments, total } = await this.appointmentRepository.findWithPagination(query, page, limit);
+            const { appointments, total } = await this._appointmentRepository.findWithPagination(query, page, limit);
             return { success: true, data: appointments, total };
         } catch (error: any) {
             return { success: false, message: error.message };
@@ -84,7 +92,7 @@ export class AppointmentService implements IAppointmentService {
 
     async getAppointmentsByDoctor(userId: string, status?: string, page = 1, limit = 10, search?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }> {
         try {
-            const doctor = await this.doctorRepository.findByUserId(userId);
+            const doctor = await this._doctorRepository.findByUserId(userId);
             if (!doctor) {
                 return { success: true, data: [], total: 0, message: 'Doctor profile not found for this user.' };
             }
@@ -98,7 +106,7 @@ export class AppointmentService implements IAppointmentService {
                     { 'serviceType': { $regex: search, $options: 'i' } }
                 ];
 
-                const matchingPets = await (this.petRepository as any).model.find({
+                const matchingPets = await (this._petRepository as any).model.find({
                     name: { $regex: search, $options: 'i' }
                 }).select('_id');
                 
@@ -107,7 +115,7 @@ export class AppointmentService implements IAppointmentService {
                 }
             }
 
-            const { appointments, total } = await this.appointmentRepository.findWithPagination(query, page, limit);
+            const { appointments, total } = await this._appointmentRepository.findWithPagination(query, page, limit);
             return { success: true, data: appointments, total };
         } catch (error: any) {
             return { success: false, message: error.message };
@@ -123,7 +131,7 @@ export class AppointmentService implements IAppointmentService {
                     { 'serviceType': { $regex: search, $options: 'i' } }
                 ];
             }
-            const { appointments, total } = await this.appointmentRepository.findWithPagination(query, page, limit);
+            const { appointments, total } = await this._appointmentRepository.findWithPagination(query, page, limit);
             return { success: true, data: appointments, total };
         } catch (error: any) {
             return { success: false, message: error.message };
@@ -132,7 +140,7 @@ export class AppointmentService implements IAppointmentService {
 
     async updateAppointmentStatus(appointmentId: string, status: AppointmentStatus, userId: string): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
         try {
-            const appointment = await this.appointmentRepository.findById(appointmentId);
+            const appointment = await this._appointmentRepository.findById(appointmentId);
             if (!appointment) throw new Error('Appointment not found');
 
             if (!appointment.appointmentId) {
@@ -141,7 +149,7 @@ export class AppointmentService implements IAppointmentService {
             }
 
             if (status === AppointmentStatus.CONFIRMED) {
-                const doctor = await this.doctorRepository.findByUserId(userId);
+                const doctor = await this._doctorRepository.findByUserId(userId);
                 if (!doctor || appointment.doctorId.toString() !== doctor._id.toString()) {
                     throw new Error('Unauthorized');
                 }
@@ -164,7 +172,7 @@ export class AppointmentService implements IAppointmentService {
         const session = await mongoose.startSession();
         session.startTransaction();
         try {
-            const appointment = await this.appointmentRepository.findById(appointmentId);
+            const appointment = await this._appointmentRepository.findById(appointmentId);
             if (!appointment) throw new Error('Appointment not found');
 
             if (appointment.status === AppointmentStatus.COMPLETED || appointment.status === AppointmentStatus.CANCELLED) {
@@ -203,7 +211,7 @@ export class AppointmentService implements IAppointmentService {
             }).sort({ startTime: 1 });
 
             if (slots.length === 0) {
-                const doctor = await this.doctorRepository.findById(doctorId);
+                const doctor = await this._doctorRepository.findById(doctorId);
                 if (!doctor) throw new Error('Doctor not found');
 
                 const dayOfWeek = requestedDate.toLocaleDateString('en-US', { weekday: 'long' });
@@ -256,7 +264,7 @@ export class AppointmentService implements IAppointmentService {
 
     async getAppointmentById(id: string): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
         try {
-            const appointment = await this.appointmentRepository.findWithDetails({ _id: id });
+            const appointment = await this._appointmentRepository.findWithDetails({ _id: id });
             if (!appointment || appointment.length === 0) {
                 return { success: false, message: 'Appointment not found' };
             }
@@ -268,7 +276,7 @@ export class AppointmentService implements IAppointmentService {
 
     async checkIn(appointmentId: string, role: 'owner' | 'doctor'): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
         try {
-            const appointment = await this.appointmentRepository.findById(appointmentId);
+            const appointment = await this._appointmentRepository.findById(appointmentId);
             if (!appointment) throw new Error('Appointment not found');
 
             const now = new Date();
@@ -287,7 +295,7 @@ export class AppointmentService implements IAppointmentService {
 
     async checkOut(appointmentId: string, role: 'owner' | 'doctor'): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
         try {
-            const appointment = await this.appointmentRepository.findById(appointmentId);
+            const appointment = await this._appointmentRepository.findById(appointmentId);
             if (!appointment) throw new Error('Appointment not found');
 
             const now = new Date();
@@ -307,7 +315,7 @@ export class AppointmentService implements IAppointmentService {
 
     async getPatientsByDoctor(userId: string, page: number, limit: number, search?: string): Promise<{ success: boolean; data?: any[]; total?: number; message?: string }> {
         try {
-            const doctor = await this.doctorRepository.findByUserId(userId);
+            const doctor = await this._doctorRepository.findByUserId(userId);
             if (!doctor) throw new Error('Doctor not found');
 
             const doctorId = doctor._id;
@@ -353,7 +361,7 @@ export class AppointmentService implements IAppointmentService {
                 });
             }
 
-            const totalResult = await (this.appointmentRepository as any).model.aggregate([
+            const totalResult = await (this._appointmentRepository as any).model.aggregate([
                 ...aggregation,
                 { $count: "total" }
             ]);
@@ -365,7 +373,7 @@ export class AppointmentService implements IAppointmentService {
                 { $limit: limit }
             );
 
-            const patients = await (this.appointmentRepository as any).model.aggregate(aggregation);
+            const patients = await (this._appointmentRepository as any).model.aggregate(aggregation);
 
             const formattedPatients = patients.map((p: any) => ({
                 id: p._id.petId,

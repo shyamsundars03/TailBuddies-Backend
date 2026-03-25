@@ -8,14 +8,18 @@ export class UserController {
 
 
 
-    constructor(private readonly userService: IUserService) { }
+    private readonly _userService: IUserService;
+
+    constructor(userService: IUserService) {
+        this._userService = userService;
+    }
 
 
 
 
     getProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const user = await this.userService.getUserProfile(req.user!.userId);
+            const user = await this._userService.getUserProfile(req.user!.userId);
             res.status(HttpStatus.OK).json({
                 success: true,
                 message: SuccessMessages.FETCH_SUCCESS,
@@ -35,7 +39,7 @@ export class UserController {
 
     updateProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const user = await this.userService.updateUserProfile(req.user!.userId, req.body);
+            const user = await this._userService.updateUserProfile(req.user!.userId, req.body);
             res.status(HttpStatus.OK).json({
                 success: true,
                 message: SuccessMessages.USER_UPDATED,
@@ -69,7 +73,7 @@ export class UserController {
                 return;
             }
 
-            const user = await this.userService.updateProfilePic(
+            const user = await this._userService.updateProfilePic(
                 req.user!.userId,
                 profilePic
             );
@@ -93,7 +97,7 @@ export class UserController {
 
     initiateEmailChange = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-            await this.userService.initiateEmailChange(req.user!.userId);
+            await this._userService.initiateEmailChange(req.user!.userId);
             res.status(HttpStatus.OK).json({
                 success: true,
                 message: SuccessMessages.OTP_SENT
@@ -113,7 +117,7 @@ export class UserController {
     verifyCurrentEmail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { otp } = req.body;
-            await this.userService.verifyCurrentEmail(req.user!.userId, otp);
+            await this._userService.verifyCurrentEmail(req.user!.userId, otp);
             res.status(HttpStatus.OK).json({
                 success: true,
                 message: SuccessMessages.EMAIL_VERIFIED
@@ -134,7 +138,7 @@ export class UserController {
     sendOtpToNewEmail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { newEmail } = req.body;
-            await this.userService.sendOtpToNewEmail(req.user!.userId, newEmail);
+            await this._userService.sendOtpToNewEmail(req.user!.userId, newEmail);
             res.status(HttpStatus.OK).json({
                 success: true,
                 message: SuccessMessages.OTP_SENT
@@ -154,7 +158,7 @@ export class UserController {
     verifyNewEmail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { newEmail, otp } = req.body;
-            const user = await this.userService.verifyNewEmail(req.user!.userId, newEmail, otp);
+            const user = await this._userService.verifyNewEmail(req.user!.userId, newEmail, otp);
             res.status(HttpStatus.OK).json({
                 success: true,
                 message: SuccessMessages.USER_UPDATED,

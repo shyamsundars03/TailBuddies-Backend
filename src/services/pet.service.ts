@@ -6,12 +6,16 @@ export class PetService implements IPetService {
     
     
     
-    constructor(private readonly petRepository: IPetRepository) {}
+    private readonly _petRepository: IPetRepository;
+
+    constructor(petRepository: IPetRepository) {
+        this._petRepository = petRepository;
+    }
 
 
     async addPet(ownerId: string, petData: Partial<IPet>): Promise<IPet> {
         if (petData.name) {
-            const existingPet = await this.petRepository.findByNameAndOwnerId(petData.name, ownerId);
+            const existingPet = await this._petRepository.findByNameAndOwnerId(petData.name, ownerId);
             if (existingPet) {
                 throw new Error('You already have a pet with this name');
             }
@@ -24,11 +28,11 @@ export class PetService implements IPetService {
             petData.isVaccinated = 'NO';
         }
         
-        return await this.petRepository.createPet({ ...petData, ownerId: ownerId as any });
+        return await this._petRepository.createPet({ ...petData, ownerId: ownerId as any });
     }
 
     async getOwnerPets(ownerId: string, page: number, limit: number, search?: string): Promise<{ pets: IPet[]; total: number }> {
-        return await this.petRepository.findByOwnerId(ownerId, page, limit, search);
+        return await this._petRepository.findByOwnerId(ownerId, page, limit, search);
     }
 
 
@@ -36,7 +40,7 @@ export class PetService implements IPetService {
 
 
     async getPetById(id: string): Promise<IPet> {
-        const pet = await this.petRepository.findById(id);
+        const pet = await this._petRepository.findById(id);
         if (!pet) {
             throw new Error('Pet not found');
         }
@@ -48,7 +52,7 @@ export class PetService implements IPetService {
 
 
     async updatePet(id: string, ownerId: string, updateData: Partial<IPet>): Promise<IPet> {
-        const pet = await this.petRepository.findById(id);
+        const pet = await this._petRepository.findById(id);
         if (!pet) {
             throw new Error('Pet not found');
         }
@@ -58,7 +62,7 @@ export class PetService implements IPetService {
 
         
         if (updateData.name && updateData.name !== pet.name) {
-            const existingPet = await this.petRepository.findByNameAndOwnerId(updateData.name, ownerId);
+            const existingPet = await this._petRepository.findByNameAndOwnerId(updateData.name, ownerId);
             if (existingPet) {
                 throw new Error('You already have a pet with this name');
             }
@@ -69,7 +73,7 @@ export class PetService implements IPetService {
             updateData.isVaccinated = updateData.vaccinations.length > 0 ? 'YES' : 'NO';
         }
         
-        const updatedPet = await this.petRepository.updatePet(id, updateData);
+        const updatedPet = await this._petRepository.updatePet(id, updateData);
         
         
         
@@ -89,7 +93,7 @@ export class PetService implements IPetService {
 
 
     async toggleActiveStatus(id: string, ownerId: string, isActive: boolean): Promise<IPet> {
-        const pet = await this.petRepository.findById(id);
+        const pet = await this._petRepository.findById(id);
         if (!pet) {
             throw new Error('Pet not found');
         }
@@ -97,7 +101,7 @@ export class PetService implements IPetService {
             throw new Error('Unauthorized to update this pet');
         }
 
-        const updatedPet = await this.petRepository.toggleActiveStatus(id, isActive);
+        const updatedPet = await this._petRepository.toggleActiveStatus(id, isActive);
         if (!updatedPet) {
             throw new Error('Failed to update pet status');
         }
@@ -114,11 +118,11 @@ export class PetService implements IPetService {
 
 
     async getAllPets(page: number, limit: number, search?: string): Promise<{ pets: IPet[]; total: number }> {
-        return await this.petRepository.findAll(page, limit, search);
+        return await this._petRepository.findAll(page, limit, search);
     }
 
     async deletePet(id: string, ownerId: string): Promise<void> {
-        const pet = await this.petRepository.findById(id);
+        const pet = await this._petRepository.findById(id);
         if (!pet) {
             throw new Error('Pet not found');
         }
@@ -126,7 +130,7 @@ export class PetService implements IPetService {
             throw new Error('Unauthorized to delete this pet');
         }
 
-        const isDeleted = await this.petRepository.deletePet(id);
+        const isDeleted = await this._petRepository.deletePet(id);
         if (!isDeleted) {
             throw new Error('Failed to delete pet');
         }

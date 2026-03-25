@@ -26,11 +26,19 @@ export class AdminService implements IAdminService {
 
 
 
+    private readonly _jwtService: IJwtService;
+    private readonly _specialtyRepository: ISpecialtyRepository;
+    private readonly _userRepository: IUserRepository;
+
     constructor(
-        private readonly jwtService: IJwtService,
-        private readonly specialtyRepository: ISpecialtyRepository,
-        private readonly userRepository: IUserRepository
-    ) { }
+        jwtService: IJwtService,
+        specialtyRepository: ISpecialtyRepository,
+        userRepository: IUserRepository
+    ) {
+        this._jwtService = jwtService;
+        this._specialtyRepository = specialtyRepository;
+        this._userRepository = userRepository;
+    }
 
 
 
@@ -50,8 +58,8 @@ export class AdminService implements IAdminService {
 
 
 
-            const accessToken = this.jwtService.generateAccessToken({ userId: newAdmin.id, role: 'admin' });
-            const refreshToken = this.jwtService.generateRefreshToken({ userId: newAdmin.id });
+            const accessToken = this._jwtService.generateAccessToken({ userId: newAdmin.id, role: 'admin' });
+            const refreshToken = this._jwtService.generateRefreshToken({ userId: newAdmin.id });
 
 
 
@@ -77,8 +85,8 @@ export class AdminService implements IAdminService {
         }
 
 
-        const accessToken = this.jwtService.generateAccessToken({ userId: admin.id, role: 'admin' });
-        const refreshToken = this.jwtService.generateRefreshToken({ userId: admin.id });
+        const accessToken = this._jwtService.generateAccessToken({ userId: admin.id, role: 'admin' });
+        const refreshToken = this._jwtService.generateRefreshToken({ userId: admin.id });
 
 
         logger.info('Admin login successful', { adminId: admin.id });
@@ -104,7 +112,7 @@ export class AdminService implements IAdminService {
         }
 
         
-        const existing = await this.specialtyRepository.findOne({
+        const existing = await this._specialtyRepository.findOne({
             name: { $regex: new RegExp(`^${data.name}$`, "i") }
         });
 
@@ -112,7 +120,7 @@ export class AdminService implements IAdminService {
             throw new Error("Specialty with this name already exists");
         }
 
-        return await this.specialtyRepository.create(data);
+        return await this._specialtyRepository.create(data);
     }
 
 
@@ -128,22 +136,22 @@ export class AdminService implements IAdminService {
             limit: limit,
             sort: { createdAt: -1 }
         };
-        const specialties = await this.specialtyRepository.findAll(filter, options);
+        const specialties = await this._specialtyRepository.findAll(filter, options);
         
 
 
-        const total = await (this.specialtyRepository as unknown as { model: { countDocuments: Function } }).model.countDocuments(filter);
+        const total = await (this._specialtyRepository as unknown as { _model: { countDocuments: Function } })._model.countDocuments(filter);
         
         
         return { specialties, total };
     }
 
     async updateSpecialty(id: string, data: Partial<ISpecialty>): Promise<ISpecialty | null> {
-        return await this.specialtyRepository.update(id, data);
+        return await this._specialtyRepository.update(id, data);
     }
 
     async deleteSpecialty(id: string): Promise<boolean> {
-        return await this.specialtyRepository.delete(id);
+        return await this._specialtyRepository.delete(id);
     }
 
 
@@ -187,10 +195,10 @@ export class AdminService implements IAdminService {
             sort: { createdAt: -1 }
         };
 
-        const users = await this.userRepository.findAll(filter, options);
+        const users = await this._userRepository.findAll(filter, options);
 
         
-        const userModel = (this.userRepository as unknown as { model: { countDocuments: Function } }).model;
+        const userModel = (this._userRepository as unknown as { _model: { countDocuments: Function } })._model;
         const total = await userModel.countDocuments(filter);
         const ownerCount = await userModel.countDocuments({ role: UserRole.OWNER });
         const doctorCount = await userModel.countDocuments({ role: UserRole.DOCTOR });
@@ -201,9 +209,9 @@ export class AdminService implements IAdminService {
 
 
     async toggleUserBlock(id: string): Promise<IUser | null> {
-        const user = await this.userRepository.findById(id);
+        const user = await this._userRepository.findById(id);
         if (!user) return null;
-        return await this.userRepository.update(id, { isBlocked: !user.isBlocked });
+        return await this._userRepository.update(id, { isBlocked: !user.isBlocked });
     }
 
     

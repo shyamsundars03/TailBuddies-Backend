@@ -24,12 +24,22 @@ import Admin from '../../models/admin.model';
 
 
 export class AuthService implements IAuthService {
+  private readonly _userRepository: IUserRepository;
+  private readonly _otpRepository: IOtpRepository;
+  private readonly _jwtService: IJwtService;
+  private readonly _emailService: IEmailService;
+
   constructor(
-    private readonly userRepository: IUserRepository,
-    private readonly otpRepository: IOtpRepository,
-    private readonly jwtService: IJwtService,
-    private readonly emailService: IEmailService
-  ) { }
+    userRepository: IUserRepository,
+    otpRepository: IOtpRepository,
+    jwtService: IJwtService,
+    emailService: IEmailService
+  ) {
+    this._userRepository = userRepository;
+    this._otpRepository = otpRepository;
+    this._jwtService = jwtService;
+    this._emailService = emailService;
+  }
 
 
 
@@ -42,8 +52,8 @@ export class AuthService implements IAuthService {
   private async sendOtpToEmail(email: string): Promise<string> {
     const otp = this.generateOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    await this.otpRepository.createOtp(email, otp, expiresAt);
-    const sent = await this.emailService.sendOTP(email, otp);
+    await this._otpRepository.createOtp(email, otp, expiresAt);
+    const sent = await this._emailService.sendOTP(email, otp);
     if (!sent) {
       logger.error('Failed to send OTP email', { email });
       throw new Error(ErrorMessages.OTP_SEND_FAILED);
@@ -71,7 +81,7 @@ export class AuthService implements IAuthService {
 
     const { email, password, role } = data;
 
-    const user = await this.userRepository.findUserWithPassword(email);
+    const user = await this._userRepository.findUserWithPassword(email);
     if (!user) {
       throw new Error(ErrorMessages.INVALID_CREDENTIALS);
     }
@@ -103,8 +113,8 @@ export class AuthService implements IAuthService {
 
 
 
-    const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: user.role });
-    const refreshToken = this.jwtService.generateRefreshToken({ userId: user.id });
+    const accessToken = this._jwtService.generateAccessToken({ userId: user.id, role: user.role });
+    const refreshToken = this._jwtService.generateRefreshToken({ userId: user.id });
 
     return {
       id: user.id,
@@ -152,7 +162,7 @@ export class AuthService implements IAuthService {
       const { email, sub: googleId, name: userName, picture: profilePic } = payload;
       const targetRole = role.toLowerCase();
 
-      let user = await this.userRepository.findByEmail(email);
+      let user = await this._userRepository.findByEmail(email);
 
       if (user) {
 
@@ -186,7 +196,7 @@ export class AuthService implements IAuthService {
 
       } else {
 
-        user = await this.userRepository.create({
+        user = await this._userRepository.create({
           userName,
           email,
           googleId,
@@ -198,8 +208,8 @@ export class AuthService implements IAuthService {
 
       }
 
-      const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: user.role });
-      const refreshToken = this.jwtService.generateRefreshToken({ userId: user.id });
+      const accessToken = this._jwtService.generateAccessToken({ userId: user.id, role: user.role });
+      const refreshToken = this._jwtService.generateRefreshToken({ userId: user.id });
 
       return {
         id: user.id,
@@ -241,7 +251,7 @@ export class AuthService implements IAuthService {
     const { username, email, role } = data;
 
 
-    const existingUser = await this.userRepository.findByEmail(email);
+    const existingUser = await this._userRepository.findByEmail(email);
     if (existingUser) {
       if (existingUser.role !== role) {
         throw new Error(`Account already exists with role ${existingUser.role}. Please sign in.`);
@@ -285,7 +295,7 @@ export class AuthService implements IAuthService {
 
 
     try {
-      const otpDoc = await this.otpRepository.findOtp(email);
+      const otpDoc = await this._otpRepository.findOtp(email);
       if (!otpDoc) {
         throw new AppError(ErrorMessages.OTP_EXPIRED, HttpStatus.BAD_REQUEST);
       }
@@ -301,7 +311,7 @@ export class AuthService implements IAuthService {
         const { username, phone, password, gender, role } = userData as RegisterDto;
 
 
-        const existingUser = await this.userRepository.findByEmail(email);
+        const existingUser = await this._userRepository.findByEmail(email);
         if (existingUser) {
           user = existingUser;
         } else {
@@ -319,7 +329,7 @@ export class AuthService implements IAuthService {
 
           logger.info('Creating new user from OTP verification', { email, role: targetRole });
 
-          user = await this.userRepository.create({
+          user = await this._userRepository.create({
             userName: username,
             email,
             phone,
@@ -334,7 +344,7 @@ export class AuthService implements IAuthService {
 
 
 
-        user = await this.userRepository.findByEmail(email);
+        user = await this._userRepository.findByEmail(email);
         if (!user) {
           throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
@@ -345,12 +355,12 @@ export class AuthService implements IAuthService {
 
 
       if (purpose !== 'reset') {
-        await this.otpRepository.deleteOtp(email);
+        await this._otpRepository.deleteOtp(email);
       }
 
 
-      const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: user.role });
-      const refreshToken = this.jwtService.generateRefreshToken({ userId: user.id });
+      const accessToken = this._jwtService.generateAccessToken({ userId: user.id, role: user.role });
+      const refreshToken = this._jwtService.generateRefreshToken({ userId: user.id });
 
       logger.info('User verified and created via OTP', { userId: user.id, email });
 
@@ -392,7 +402,7 @@ export class AuthService implements IAuthService {
   ////////////////////////////////// Forgot Password 
 
   async forgotPassword(email: string): Promise<void> {
-    const user = await this.userRepository.findByEmail(email);
+    const user = await this._userRepository.findByEmail(email);
     if (!user) {
       logger.warn('Forgot password for non-existent email', { email });
       throw new Error(ErrorMessages.USER_NOT_FOUND);
@@ -405,7 +415,7 @@ export class AuthService implements IAuthService {
   ////////////////////////////////// Reset Password 
 
   async resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
-    const otpDoc = await this.otpRepository.findOtp(email);
+    const otpDoc = await this._otpRepository.findOtp(email);
     if (!otpDoc) {
       throw new Error(ErrorMessages.OTP_EXPIRED);
     }
@@ -416,7 +426,7 @@ export class AuthService implements IAuthService {
 
     // Check if the new password is the same as the old one
     // We fetch the user with the password field for comparison
-    const user = await this.userRepository.findUserWithPassword(email);
+    const user = await this._userRepository.findUserWithPassword(email);
     if (!user) {
       throw new Error(ErrorMessages.USER_NOT_FOUND);
     }
@@ -431,7 +441,7 @@ export class AuthService implements IAuthService {
     user.password = newPassword;
     await user.save();
 
-    await this.otpRepository.deleteOtp(email);
+    await this._otpRepository.deleteOtp(email);
     logger.info('Password reset via OTP', { email });
   }
 
@@ -453,12 +463,12 @@ export class AuthService implements IAuthService {
   ////////////////////////////////// Change Password 
 
   async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
-    const user = await this.userRepository.findById(userId);
+    const user = await this._userRepository.findById(userId);
     if (!user) {
       throw new Error(ErrorMessages.USER_NOT_FOUND);
     }
 
-    const userWithPassword = await this.userRepository.findUserWithPassword(user.email);
+    const userWithPassword = await this._userRepository.findUserWithPassword(user.email);
     if (!userWithPassword || !userWithPassword.password) {
       throw new Error(ErrorMessages.USER_NOT_FOUND);
     }
@@ -488,12 +498,12 @@ export class AuthService implements IAuthService {
 
   async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string }> {
     try {
-      const decoded = this.jwtService.verifyToken(refreshToken, process.env.JWT_REFRESH_SECRET || '') as { userId: string };
+      const decoded = this._jwtService.verifyToken(refreshToken, process.env.JWT_REFRESH_SECRET || '') as { userId: string };
       if (!decoded || !decoded.userId) {
         throw new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
       }
 
-      let user = await this.userRepository.findById(decoded.userId);
+      let user = await this._userRepository.findById(decoded.userId);
       let role = user?.role;
 
       if (!user) {
@@ -503,7 +513,7 @@ export class AuthService implements IAuthService {
           throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
         // Admin found
-        const accessToken = this.jwtService.generateAccessToken({ userId: admin.id, role: 'admin' });
+        const accessToken = this._jwtService.generateAccessToken({ userId: admin.id, role: 'admin' });
         return { accessToken };
       }
 
@@ -511,7 +521,7 @@ export class AuthService implements IAuthService {
         throw new AppError(ErrorMessages.ACCOUNT_BLOCKED, HttpStatus.FORBIDDEN);
       }
 
-      const accessToken = this.jwtService.generateAccessToken({ userId: user.id, role: role || 'user' });
+      const accessToken = this._jwtService.generateAccessToken({ userId: user.id, role: role || 'user' });
       return { accessToken };
     } catch (error) {
       logger.error('Refresh Token Error:', error);
