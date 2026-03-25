@@ -2,6 +2,9 @@ import OTP, { IOTP } from '../models/otp.model';
 import { IOtpRepository } from './interfaces/IOtpRepository';
 
 export class OtpRepository implements IOtpRepository {
+    
+    
+    
     async createOtp(email: string, otp: string, expiresAt: Date): Promise<IOTP> {
        
 
@@ -17,6 +20,8 @@ export class OtpRepository implements IOtpRepository {
 
 
     
+
+
     async findOtp(email: string): Promise<IOTP | null> {
         return await OTP.findOne({
             email: email.toLowerCase(),
@@ -24,6 +29,9 @@ export class OtpRepository implements IOtpRepository {
         });
     }
 
+
+
+    
     async deleteOtp(email: string): Promise<void> {
         await OTP.deleteMany({ email: email.toLowerCase() });
     }

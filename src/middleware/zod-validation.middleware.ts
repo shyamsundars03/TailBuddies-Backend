@@ -3,6 +3,9 @@ import { ZodSchema, ZodError } from 'zod';
 import { HttpStatus } from '../constants';
 
 export const validateRequest = (schema: ZodSchema) => {
+
+
+    
     return async (req: Request, res: Response, next: NextFunction) => {
         try {
             await schema.parseAsync(req.body);

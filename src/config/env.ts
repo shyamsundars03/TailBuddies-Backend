@@ -19,6 +19,9 @@ interface EnvConfig {
   cloudinaryApiSecret: string;
   frontendUrl: string;
   dbName?: string; 
+  jwtAccessExpiry: string;
+  jwtRefreshExpiry: string;
+  jwtRefreshMaxAge: number;
 }
 
 class EnvValidator {
@@ -44,6 +47,9 @@ class EnvValidator {
       frontendUrl: process.env.FRONTEND_URL,
        dbName: process.env.MONGO_URI ? 
     process.env.MONGO_URI.split('/').pop()?.split('?')[0] : undefined,
+      jwtAccessExpiry: process.env.JWT_ACCESS_EXPIRY || '15m',
+      jwtRefreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
+      jwtRefreshMaxAge: this.parseDurationToMs(process.env.JWT_REFRESH_EXPIRY || '7d'),
     };
   }
 
@@ -64,6 +70,8 @@ class EnvValidator {
   this.validateMongoUri();
   this.validateNodeEnv();
   this.validateSmtpPort();
+  this.validateDuration('jwtAccessExpiry');
+  this.validateDuration('jwtRefreshExpiry');
 
 
 
@@ -105,15 +113,33 @@ this.errors.push('NODE_ENV must be development, production, or test');
 }
 }
 
-private validateSmtpPort() {
-const port = this.config.smtpPort;
-if (port && (port < 1 || port > 65535)) {
-this.errors.push('SMTP_PORT must be a valid port number');
-}
-}
+  private validateSmtpPort() {
+    const port = this.config.smtpPort;
+    if (port && (port < 1 || port > 65535)) {
+      this.errors.push('SMTP_PORT must be a valid port number');
+    }
+  }
 
+  private validateDuration(key: keyof EnvConfig) {
+    const duration = this.config[key] as string;
+    if (duration && !duration.match(/^(\d+)([smhd])$/)) {
+      this.errors.push(`${key} must be in format like '15m', '1h', or '7d'`);
+    }
+  }
 
-
+  private parseDurationToMs(duration: string): number {
+    const match = duration.match(/^(\d+)([smhd])$/);
+    if (!match) return 7 * 24 * 60 * 60 * 1000;
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    switch (unit) {
+      case 's': return value * 1000;
+      case 'm': return value * 60 * 1000;
+      case 'h': return value * 60 * 60 * 1000;
+      case 'd': return value * 24 * 60 * 60 * 1000;
+      default: return 7 * 24 * 60 * 60 * 1000;
+    }
+  }
 }
 
 export const env = new EnvValidator().validate();

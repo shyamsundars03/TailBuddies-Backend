@@ -12,6 +12,11 @@ export interface IUser extends Document {
   role: UserRole;
   profilePic?: string;
   googleId?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
   isBlocked: boolean;
   isVerified: boolean;
   createdAt: Date;
@@ -62,6 +67,27 @@ const userSchema = new Schema<IUser>(
     profilePic: {
       type: String,
       default: '',
+    },
+    address: {
+      type: String,
+      default: '',
+    },
+    city: {
+      type: String,
+      default: '',
+    },
+    state: {
+      type: String,
+      default: '',
+    },
+    country: {
+      type: String,
+      default: '',
+    },
+    pincode: {
+      type: String,
+      default: '',
+      match: [/^\d{6}$/, "Pincode must be exactly 6 digits"],
     },
     isBlocked: {
       type: Boolean,

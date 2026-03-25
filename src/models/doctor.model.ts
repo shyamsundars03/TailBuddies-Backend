@@ -64,6 +64,7 @@ export interface IDoctor extends Document {
     rejectionReason?: string | null;
     isVerified: boolean;
     isActive: boolean;
+    appointmentDuration: number;
     totalAppointments: number;
     createdAt: Date;
     updatedAt: Date;
@@ -159,6 +160,10 @@ const doctorSchema = new Schema<IDoctor>(
         isActive: {
             type: Boolean,
             default: true,
+        },
+        appointmentDuration: {
+            type: Number,
+            default: 30, // Default to 30 minutes
         },
         totalAppointments: {
             type: Number,

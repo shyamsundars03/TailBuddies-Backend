@@ -7,6 +7,6 @@ export interface IDoctorService {
     updateDoctorProfile(userId: string, data: UpdateDoctorProfileDto): Promise<IDoctor>;
     verifyDoctor(doctorId: string, data: VerifyDoctorDto): Promise<IDoctor>;
     requestVerification(userId: string): Promise<IDoctor>;
-    getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string): Promise<{ doctors: IDoctor[], total: number }>;
+    getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string, filters?: any): Promise<{ doctors: IDoctor[], total: number }>;
     getSpecialties(): Promise<any[]>;
 }

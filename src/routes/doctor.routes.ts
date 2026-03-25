@@ -8,7 +8,7 @@ import { uploadDoc } from '../middleware/upload.middleware';
 
 const router = Router();
 
-// Simple role check middleware
+
 const doctorOnly = (req: AuthRequest, res: Response, next: NextFunction) => {
     if (req.user?.role !== UserRole.DOCTOR) {
         return next(new AppError(ErrorMessages.FORBIDDEN || 'Access Denied', HttpStatus.FORBIDDEN));
@@ -16,9 +16,10 @@ const doctorOnly = (req: AuthRequest, res: Response, next: NextFunction) => {
     next();
 };
 
-// All doctor routes are protected
+
 router.use(authMiddleware as unknown as RequestHandler);
 router.use(doctorOnly as unknown as RequestHandler);
+
 
 // Doctor Profile Routes
 router.get('/profile', doctorController.getProfile);

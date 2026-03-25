@@ -4,7 +4,17 @@ import { HttpStatus } from '../../constants';
 import logger from '../../logger';
 
 export class DoctorController {
+
+
+
+
     constructor(private readonly doctorService: IDoctorService) { }
+
+
+
+
+
+
 
     getProfile = async (req: Request, res: Response) => {
         try {
@@ -24,18 +34,26 @@ export class DoctorController {
         }
     };
 
+
+
+
+
+
+
+
+
     getById = async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
             const profile: any = await this.doctorService.getDoctorById(String(id));
 
-            console.log(`[DoctorController] Fetched doctor ${id} for Admin. Population check:`, {
-                hasUserId: !!profile?.userId,
-                userIdType: typeof profile?.userId,
-                hasSpecialtyId: !!profile?.profile?.specialtyId,
-                specialtyIdType: typeof profile?.profile?.specialtyId,
-                specialtyName: profile?.profile?.specialtyId?.name
-            });
+            // console.log(`[DoctorController] Fetched doctor ${id} for Admin. Population check:`, {
+            //     hasUserId: !!profile?.userId,
+            //     userIdType: typeof profile?.userId,
+            //     hasSpecialtyId: !!profile?.profile?.specialtyId,
+            //     specialtyIdType: typeof profile?.profile?.specialtyId,
+            //     specialtyName: profile?.profile?.specialtyId?.name
+            // });
 
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -49,6 +67,16 @@ export class DoctorController {
             });
         }
     };
+
+
+
+
+
+
+
+
+
+
 
     updateProfile = async (req: Request, res: Response) => {
         try {
@@ -68,6 +96,17 @@ export class DoctorController {
             });
         }
     };
+
+
+
+
+
+
+
+
+
+
+
 
     verifyDoctor = async (req: Request, res: Response) => {
         try {
@@ -91,15 +130,40 @@ export class DoctorController {
         }
     };
 
+
+
+
+
+
+
+
+
+
+
+
+
     getAllDoctors = async (req: Request, res: Response) => {
         try {
             const page = parseInt(String(req.query.page)) || 1;
-            const limit = parseInt(String(req.query.limit)) || 10;
             const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-            const isVerified = req.query.isVerified ? String(req.query.isVerified) === 'true' : undefined;
+            const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+            
+            const isAdmin = (req as any).user?.role === 'admin';
+            const limit = parseInt(String(req.query.limit)) || (isAdmin ? 10 : 9);
+            
+            let isVerified = req.query.isVerified !== undefined ? String(req.query.isVerified) === 'true' : undefined;
+            if (!isAdmin && isVerified === undefined) {
+                isVerified = true;
+            }
 
-            logger.info(`[DoctorController] Fetching all doctors with page: ${page}, limit: ${limit}, search: ${search}, isVerified: ${isVerified}`);
-            const result = await this.doctorService.getAllDoctors(page, limit, search, isVerified);
+            const filters = {
+                specialty: req.query.specialty,
+                gender: req.query.gender,
+                experienceYears: req.query.experienceYears
+            };
+
+            logger.info(`[DoctorController] Fetching doctors: page=${page}, limit=${limit}, search=${search}, isVerified=${isVerified}`);
+            const result = await this.doctorService.getAllDoctors(page, limit, search, isVerified, status, filters);
 
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -108,7 +172,6 @@ export class DoctorController {
                 page,
                 limit,
             });
-            logger.info(`[DoctorController] Successfully fetched ${result.doctors.length} doctors (total: ${result.total})`);
         } catch (error: any) {
             logger.error('Error fetching all doctors', { error: error.message });
             res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
@@ -117,6 +180,21 @@ export class DoctorController {
             });
         }
     };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     requestVerification = async (req: Request, res: Response) => {
         try {
@@ -139,6 +217,20 @@ export class DoctorController {
         }
     };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     getSpecialties = async (req: Request, res: Response) => {
         try {
             console.log(`[DoctorController] Fetching specialties for user: ${(req as any).user?.userId}`);
@@ -156,4 +248,17 @@ export class DoctorController {
             });
         }
     };
+
+
+
+
+
+
+
+
+
+
+
+
+    
 }

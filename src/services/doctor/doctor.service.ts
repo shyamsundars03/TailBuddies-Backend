@@ -8,32 +8,42 @@ import { HttpStatus, ErrorMessages } from '../../constants';
 import logger from '../../logger';
 
 export class DoctorService implements IDoctorService {
+    
+    
+    
     constructor(
         private readonly doctorRepository: IDoctorRepository,
         private readonly specialtyRepository: ISpecialtyRepository
     ) { }
 
+
+
+
     async getDoctorProfile(userId: string): Promise<IDoctor | null> {
-        return await (this.doctorRepository as any).model.findOne({ userId })
-            .populate({ path: 'userId', select: 'userName email gender phone profilePic', model: 'User' })
-            .populate({ path: 'profile.specialtyId', model: 'Specialty' });
+        return await this.doctorRepository.findByUserIdWithDetails(userId);
     }
 
     async getDoctorById(doctorId: string): Promise<IDoctor | null> {
-        return await (this.doctorRepository as any).model.findById(doctorId)
-            .populate({ path: 'userId', select: 'userName email gender phone profilePic', model: 'User' })
-            .populate({ path: 'profile.specialtyId', model: 'Specialty' });
+        return await this.doctorRepository.findByIdWithDetails(doctorId);
     }
+
+
+
+
+
+
+
+
 
     async updateDoctorProfile(userId: string, data: UpdateDoctorProfileDto): Promise<IDoctor> {
         let doctor = await this.doctorRepository.findByUserId(userId);
 
         if (!doctor) {
-            // Create a basic doctor profile if it doesn't exist
+            
             doctor = await this.doctorRepository.create({ userId } as any);
         }
 
-        // Initialize verificationStatus if missing
+        
         if (!doctor.verificationStatus) {
             doctor.verificationStatus = {
                 clinic: false,
@@ -44,7 +54,7 @@ export class DoctorService implements IDoctorService {
             };
         }
 
-        // Sync with User model if identity fields are provided
+        
         const userData = data as any;
         if (userData.userName || userData.gender || userData.phone) {
             const updateFields: any = {};
@@ -53,15 +63,16 @@ export class DoctorService implements IDoctorService {
             if (userData.phone) updateFields.phone = userData.phone;
             
             await (this.doctorRepository as any).model.db.model('User').findByIdAndUpdate(doctor.userId, updateFields);
-            console.log(`[DoctorService] Synchronized user fields for ${userId}:`, updateFields);
+            // console.log(`[DoctorService] Synchronized user fields for ${userId}:`, updateFields);
         }
 
-        // Update fields if provided and reset verification flags
+        
         if (data.profile) {
             doctor.profile = { ...doctor.profile, ...data.profile } as any;
-            // Optional: profile basic details don't have a specific verification flag yet
-            // but we could reset overall verification if needed.
+          
         }
+
+
 
         if (data.clinicInfo) {
             const { address, location, ...rest } = data.clinicInfo;
@@ -121,7 +132,7 @@ export class DoctorService implements IDoctorService {
         }
 
         if (data.businessHours) {
-            console.log(`[DoctorService] Updating business hours for ${userId}:`, JSON.stringify(data.businessHours));
+            // console.log(`[DoctorService] Updating business hours for ${userId}:`, JSON.stringify(data.businessHours));
             doctor.businessHours = data.businessHours as any;
             doctor.verificationStatus.businessHours = false;
             doctor.markModified('businessHours');
@@ -131,30 +142,47 @@ export class DoctorService implements IDoctorService {
             doctor.profile.specialtyId = data.profile.specialtyId as any;
         }
 
-        // Always mark verificationStatus as modified since it's a nested object
+        if (data.appointmentDuration) {
+            doctor.appointmentDuration = data.appointmentDuration;
+        }
+
+        if (data.isActive !== undefined) {
+            doctor.isActive = data.isActive;
+        }
+
+        
         doctor.markModified('verificationStatus');
         doctor.markModified('profile');
 
-        // If doctor makes an edit, check if we need to reset status
-        // STRICT LOGIC: once verified, status NEVER changes back to incomplete.
-        // If incomplete, and they update, it stays incomplete until they request verification.
-        // If under_review or rejected, and they update, it stays in that status (admin just sees new data).
-        if (doctor.profileStatus === 'incomplete') {
-            // Keep as incomplete or move to under_review if needed?
-            // Usually, user has to click "Get Verified" to trigger under_review.
-        } else if (doctor.profileStatus === 'verified') {
-            console.log(`[DoctorService] Doctor ${userId} is already verified. Edits will NOT reset status.`);
-        } else {
-            console.log(`[DoctorService] Doctor ${userId} status is ${doctor.profileStatus}. Maintaining status during edit.`);
-        }
         
         const updatedDoctor = await doctor.save();
+
+
+
         logger.info('Doctor profile updated successfully', { userId, fields: Object.keys(data) });
+        
+        
         return updatedDoctor;
     }
 
+
+
+
+
+
+
+
+
+
+
+
     async verifyDoctor(doctorId: string, data: VerifyDoctorDto): Promise<IDoctor> {
+        
+        
         const doctor = await this.doctorRepository.findById(doctorId);
+        
+        
+        
         if (!doctor) {
             throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
@@ -171,17 +199,17 @@ export class DoctorService implements IDoctorService {
                 doctor.rejectionReason = data.rejectionReason;
             } else if (data.isVerified) {
                 doctor.rejectionReason = null;
-                // On global approval, set all section flags to true for consistency
+                
                 doctor.verificationStatus = {
                     clinic: true,
                     education: true,
                     experience: true,
                     certificates: true,
-                    businessHours: doctor.verificationStatus.businessHours // Keep business hours as is or true? User excluded it from check, but for consistency lets set true if they exist.
+                    businessHours: doctor.verificationStatus.businessHours 
                 };
             }
         } else if (data.verificationStatus) {
-            // Check if all necessary sections are now verified
+           
             const sections = ['clinic', 'education', 'experience', 'certificates'];
             const allVerified = sections.every(s => (doctor.verificationStatus as any)[s] === true);
             
@@ -189,14 +217,21 @@ export class DoctorService implements IDoctorService {
                 doctor.isVerified = true;
                 doctor.profileStatus = 'verified';
                 doctor.rejectionReason = null;
-                console.log(`[DoctorService] All sections verified for ${doctorId}. Automatically marking as verified.`);
+                // console.log(`[DoctorService] All sections verified for ${doctorId}. Automatically marking as verified.`);
             }
         }
 
         const updatedDoctor = await doctor.save();
+
+
         logger.info('Doctor verification status updated', { doctorId, status: data.isVerified });
         return updatedDoctor;
     }
+
+
+
+
+
     async requestVerification(userId: string): Promise<IDoctor> {
         const doctor = await this.getDoctorProfile(userId);
         if (!doctor) {
@@ -209,19 +244,19 @@ export class DoctorService implements IDoctorService {
         // Basic Profile Check
         // if (!doctor.profile.designation) errors.push('Designation is required');
         
-        // Clinic Info Check
+       
         if (!doctor.clinicInfo.clinicName) errors.push('Clinic name is required');
         if (!doctor.clinicInfo.clinicPic) errors.push('Clinic picture is required');
         if (!doctor.clinicInfo.address.city) errors.push('Clinic location details are required');
 
-        // Education & Certificates Check
+        
         if (doctor.education.length === 0) errors.push('At least one education record is required');
         if (doctor.education.some(edu => !edu.educationFile)) errors.push('Education certificates are required (PDF)');
 
         if (doctor.certificates.length === 0) errors.push('At least one certificate is required');
         if (doctor.certificates.some(cert => !cert.certificateFile)) errors.push('Certificate files are required (PDF)');
 
-        // Business Hours Check - EXCLUDED per user request
+        
 
         if (errors.length > 0) {
             throw new AppError(`Incomplete Profile: ${errors.join(', ')}`, HttpStatus.BAD_REQUEST);
@@ -230,32 +265,100 @@ export class DoctorService implements IDoctorService {
         doctor.profileStatus = 'under_review';
         doctor.isVerified = false;
         
+
+
         return await doctor.save();
+
+
+
     }
 
-    async getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string): Promise<{ doctors: IDoctor[], total: number }> {
+
+
+
+
+
+
+
+
+    async getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string, filters?: any): Promise<{ doctors: IDoctor[], total: number }> {
         const filter: any = {};
+        
+        
         if (isVerified !== undefined) {
             filter.isVerified = isVerified;
+        }
+        
+        
+
+
+
+        if (isVerified === true) {
+            filter.isActive = true;
         }
 
         if (status && status !== 'all') {
             filter.profileStatus = status;
-        } else {
-            // Admin list should ONLY show doctors who have submitted for review or are already handled.
-            // This ensures NEW (incomplete) doctors are completely hidden.
+        } else if (!isVerified) {
+            
             filter.profileStatus = { $in: ['under_review', 'verified', 'rejected'] };
         }
         
-        console.log(`[DoctorService] getAllDoctors filter:`, JSON.stringify(filter));
-        
-        // Search by name would require population of user info
+
+        if (filters) {
+            if (filters.specialty) {
+                filter['profile.specialtyId'] = filters.specialty;
+            }
+
+            if (filters.experienceYears) {
+                filter['profile.experienceYears'] = { $gte: Number(filters.experienceYears) };
+            }
+        }
+
+   
         if (search) {
+            
+            const matchingUsers = await (this.doctorRepository as any).model.db.model('User').find({
+                userName: { $regex: search, $options: 'i' }
+            }).select('_id');
+
+
+            const userIds = matchingUsers.map((u: any) => u._id);
+
+
+
             filter.$or = [
+                { userId: { $in: userIds } },
                 { 'profile.designation': { $regex: search, $options: 'i' } },
                 { 'clinicInfo.clinicName': { $regex: search, $options: 'i' } }
             ];
+            
+           
         }
+
+
+
+
+        if (filters?.gender) {
+            const genderUsers = await (this.doctorRepository as any).model.db.model('User').find({
+                gender: { $regex: `^${filters.gender}$`, $options: 'i' }
+            }).select('_id');
+            const genderUserIds = genderUsers.map((u: any) => u._id);
+            
+            filter.userId = { $in: genderUserIds };
+            
+            // If we have search-based $or for userId, we must intersect it
+            if (filter.$or) {
+                const searchOr = filter.$or;
+                delete filter.$or;
+                filter.$and = [
+                    { $or: searchOr },
+                    { userId: { $in: genderUserIds } }
+                ];
+            }
+        }
+        
+        // console.log(`[DoctorService] getAllDoctors final filter:`, JSON.stringify(filter));
         
         const options = {
             skip: (page - 1) * limit,

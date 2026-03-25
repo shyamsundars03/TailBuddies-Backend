@@ -12,12 +12,21 @@ import { JwtService } from '../services/jwt.service';
 import { EmailService } from '../services/email.service';
 import { DoctorService } from '../services/doctor/doctor.service';
 import { DoctorController } from '../controllers/doctor/doctor.controller';
+import { PetRepository } from '../repositories/pet.repository';
+import { PetService } from '../services/pet.service';
+import { UserPetController } from '../controllers/user/pet.controller';
+import { AdminPetController } from '../controllers/admin/pet.controller';
+import { AppointmentRepository } from '../repositories/appointment.repository';
+import { AppointmentService } from '../services/appointment/appointment.service';
+import { AppointmentController } from '../controllers/appointment/appointment.controller';
 
 // Repositories
 const userRepository = new UserRepository();
 const otpRepository = new OtpRepository();
 const specialtyRepository = new SpecialtyRepository();
 const doctorRepository = new DoctorRepository();
+const petRepository = new PetRepository();
+const appointmentRepository = new AppointmentRepository();
 
 // Services
 const jwtService = new JwtService();
@@ -26,16 +35,24 @@ const authService = new AuthService(userRepository, otpRepository, jwtService, e
 const adminService = new AdminService(jwtService, specialtyRepository, userRepository);
 const userService = new UserService(userRepository, otpRepository, emailService);
 const doctorService = new DoctorService(doctorRepository, specialtyRepository);
+const petService = new PetService(petRepository);
+const appointmentService = new AppointmentService(appointmentRepository, doctorRepository, petRepository);
 
 // Controllers
 const authController = new AuthController(authService);
 const adminController = new AdminController(adminService, doctorService);
 const userController = new UserController(userService);
 const doctorController = new DoctorController(doctorService);
+const userPetController = new UserPetController(petService);
+const adminPetController = new AdminPetController(petService);
+const appointmentController = new AppointmentController(appointmentService);
 
 export {
     authController,
     adminController,
     userController,
     doctorController,
+    userPetController,
+    adminPetController,
+    appointmentController,
 };
