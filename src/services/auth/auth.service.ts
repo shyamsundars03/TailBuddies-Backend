@@ -118,7 +118,7 @@ export class AuthService implements IAuthService {
 
     return {
       id: user.id,
-      userName: user.userName,
+      username: user.username,
       email: user.email,
       role: user.role,
       phone: user.phone,
@@ -159,7 +159,7 @@ export class AuthService implements IAuthService {
         throw new Error(ErrorMessages.INVALID_CREDENTIALS);
       }
 
-      const { email, sub: googleId, name: userName, picture: profilePic } = payload;
+      const { email, sub: googleId, name: username, picture: profilePic } = payload;
       const targetRole = role.toLowerCase();
 
       let user = await this._userRepository.findByEmail(email);
@@ -197,7 +197,7 @@ export class AuthService implements IAuthService {
       } else {
 
         user = await this._userRepository.create({
-          userName,
+          username,
           email,
           googleId,
           profilePic,
@@ -213,7 +213,7 @@ export class AuthService implements IAuthService {
 
       return {
         id: user.id,
-        userName: user.userName,
+        username: user.username,
         email: user.email,
         role: user.role,
         phone: user.phone,
@@ -267,7 +267,7 @@ export class AuthService implements IAuthService {
 
     return {
       id: '',
-      userName: username,
+      username: username,
       email: email,
       phone: data.phone || '',
       role: data.role || '',
@@ -330,7 +330,7 @@ export class AuthService implements IAuthService {
           logger.info('Creating new user from OTP verification', { email, role: targetRole });
 
           user = await this._userRepository.create({
-            userName: username,
+            username: username,
             email,
             phone,
             password,
@@ -366,7 +366,7 @@ export class AuthService implements IAuthService {
 
       return {
         id: user.id,
-        userName: user.userName,
+        username: user.username,
         email: user.email,
         role: user.role,
         phone: user.phone,

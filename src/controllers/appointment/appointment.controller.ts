@@ -118,6 +118,59 @@ export class AppointmentController {
         }
     };
 
+    getStats = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const userId = req.user?.userId;
+            if (!userId) {
+                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+                return;
+            }
+            const result = await this._appointmentService.getDoctorStats(userId);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error fetching doctor stats', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
+
+    getOwnerStats = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const userId = req.user?.userId;
+            if (!userId) {
+                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+                return;
+            }
+            const result = await this._appointmentService.getOwnerStats(userId);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error fetching owner stats', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
+
+    cancelPendingAppointment = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const { id } = req.params;
+            const result = await this._appointmentService.cancelPendingAppointment(id as string);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error cancelling pending appointment', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
+
 
 
 
@@ -135,7 +188,7 @@ export class AppointmentController {
 
 
     updateStatus = async (req: AuthRequest, res: Response): Promise<void> => {
-        // ... (omitting unchanged lines 75-106 for brevity, but I must match TargetContent precisely)
+      
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -248,6 +301,13 @@ export class AppointmentController {
                 doctorId as string,
                 new Date(date as string)
             );
+
+
+// console.log("backend:", result)
+
+logger.info(`backend:`, result)
+
+
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;
@@ -355,6 +415,21 @@ export class AppointmentController {
             res.status(HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
             logger.error('Error fetching doctor patients', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
+
+    checkSlotAvailability = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const { id } = req.params;
+            const result = await this._appointmentService.checkSlotAvailability(id as string);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error checking slot availability', { error: error.message });
             res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
         }
     };

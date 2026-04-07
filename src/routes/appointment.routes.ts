@@ -12,13 +12,17 @@ router.get('/all', authMiddleware, appointmentController.getAll);
 
 // Owner routes
 router.get('/', authMiddleware, appointmentController.getOwnerAppointments);
+router.get('/owner/stats', authMiddleware, appointmentController.getOwnerStats);
+router.post('/:id/cancel-pending', authMiddleware, appointmentController.cancelPendingAppointment);
 
 // Doctor routes
 router.get('/doctor', authMiddleware, appointmentController.getDoctorAppointments);
+router.get('/doctor/stats', authMiddleware, appointmentController.getStats);
 router.get('/doctor/patients', authMiddleware, appointmentController.getPatientsByDoctor);
 
 // Single Appointment
 router.get('/slots', authMiddleware, appointmentController.getAvailableSlots);
+router.get('/:id/check-slot', authMiddleware, appointmentController.checkSlotAvailability);
 router.get('/:id', authMiddleware, appointmentController.getById);
 
 // Booking

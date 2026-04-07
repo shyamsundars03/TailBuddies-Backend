@@ -51,6 +51,9 @@ export interface IDoctor extends Document {
     businessHours: {
         day: string;
         isWorking: boolean;
+        startTime: string;
+        endTime: string;
+        duration: string;
         slots: string[];
     }[];
     verificationStatus: {
@@ -66,6 +69,15 @@ export interface IDoctor extends Document {
     isActive: boolean;
     appointmentDuration: number;
     totalAppointments: number;
+    recurringSchedules?: {
+        id: string;
+        rrule: string;
+        dtstart: Date;
+        dtend?: Date;
+        isWorking: boolean;
+        startTime: string;
+        endTime: string;
+    }[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -134,6 +146,9 @@ const doctorSchema = new Schema<IDoctor>(
             {
                 day: { type: String, required: true },
                 isWorking: { type: Boolean, default: true },
+                startTime: { type: String, default: '09:00' },
+                endTime: { type: String, default: '17:00' },
+                duration: { type: String, default: '30' },
                 slots: [String],
             },
         ],
@@ -169,6 +184,17 @@ const doctorSchema = new Schema<IDoctor>(
             type: Number,
             default: 0,
         },
+        recurringSchedules: [
+            {
+                id: { type: String, required: true },
+                rrule: { type: String, required: true },
+                dtstart: { type: Date, required: true },
+                dtend: { type: Date },
+                isWorking: { type: Boolean, default: true },
+                startTime: { type: String, required: true },
+                endTime: { type: String, required: true },
+            },
+        ],
     },
     {
         timestamps: true,

@@ -12,6 +12,7 @@ import adminRoutes from './routes/admin.routes';
 import userRoutes from './routes/user.routes';
 import doctorRoutes from './routes/doctor.routes';
 import appointmentRoutes from './routes/appointment.routes';
+import paymentRoutes from './routes/payment.routes';
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api', routes);
 
 

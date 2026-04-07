@@ -4,7 +4,7 @@ import { UserRole } from '../enums/user-role.enum';
 import { Gender } from '../enums/gender.enum';
 
 export interface IUser extends Document {
-  userName: string;
+  username: string;
   email: string;
   phone?: string;
   password?: string;
@@ -26,7 +26,7 @@ export interface IUser extends Document {
 
 const userSchema = new Schema<IUser>(
   {
-    userName: {
+    username: {
       type: String,
       required: [true, 'Username is required'],
       trim: true,
@@ -100,7 +100,15 @@ const userSchema = new Schema<IUser>(
   },
   {
     timestamps: true,
+    strict: false,
     toJSON: {
+      transform: function (doc, ret: Record<string, unknown>) {
+        delete ret.password;
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toObject: {
       transform: function (doc, ret: Record<string, unknown>) {
         delete ret.password;
         delete ret.__v;
@@ -125,6 +133,13 @@ userSchema.pre('save', async function (next) {
 userSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
   return await bcrypt.compare(candidatePassword, this.password);
 };
+
+userSchema.post('init', function (doc) {
+  // Handle legacy userName field by mapping it to username
+  if ((doc as any).userName && !doc.username) {
+    doc.username = (doc as any).userName;
+  }
+});
 
 export const User = mongoose.model<IUser>('User', userSchema);
 export default User;

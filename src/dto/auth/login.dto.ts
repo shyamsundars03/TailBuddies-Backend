@@ -6,7 +6,7 @@ export interface LoginDto {
 
 export interface LoginResponseDto {
     id: string;
-    userName: string;
+    username: string;
     email: string;
     role: string;
     phone?: string;

@@ -6,4 +6,5 @@ export interface IAppointmentRepository extends IBaseRepository<IAppointment> {
   
   findWithDetails(query: any): Promise<IAppointment[]>;
   findWithPagination(query: any, page: number, limit: number): Promise<{ appointments: IAppointment[], total: number }>;
+  countDocuments(query?: Record<string, unknown>): Promise<number>;
 }

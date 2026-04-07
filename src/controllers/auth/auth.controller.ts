@@ -27,7 +27,7 @@ export class AuthController {
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: env.jwtRefreshMaxAge,
       });
 
@@ -37,7 +37,7 @@ export class AuthController {
         data: {
           user: {
             id: result.id,
-            userName: result.userName,
+            username: result.username,
             email: result.email,
             role: result.role,
             phone: result.phone,
@@ -64,6 +64,9 @@ export class AuthController {
       const data: RegisterDto = req.body;
       logger.info('Registration request received', { email: data.email });
       const user = await this._authService.register(data);
+
+
+      
       res.status(HttpStatus.CREATED).json({
         success: true,
         message: SuccessMessages.OTP_SENT,
@@ -85,7 +88,7 @@ export class AuthController {
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: env.jwtRefreshMaxAge,
       });
 
@@ -95,7 +98,7 @@ export class AuthController {
         data: {
           user: {
             id: result.id,
-            userName: result.userName,
+            username: result.username,
             email: result.email,
             role: result.role,
             phone: result.phone,
@@ -117,7 +120,7 @@ export class AuthController {
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: env.jwtRefreshMaxAge,
       });
 
@@ -127,7 +130,7 @@ export class AuthController {
         data: {
           user: {
             id: result.id,
-            userName: result.userName,
+            username: result.username,
             email: result.email,
             role: result.role,
             phone: result.phone,
@@ -217,7 +220,7 @@ export class AuthController {
       res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
       });
       next(error);
     }
@@ -228,7 +231,7 @@ export class AuthController {
       res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
       });
       res.status(HttpStatus.OK).json({
         success: true,

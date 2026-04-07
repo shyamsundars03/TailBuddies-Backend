@@ -6,11 +6,12 @@ import { UpdateDoctorProfileDto, VerifyDoctorDto } from '../../dto/doctor.dto';
 import { AppError } from '../../errors/app-error';
 import { HttpStatus, ErrorMessages } from '../../constants';
 import logger from '../../logger';
+import Slot from '../../models/slot.model';
 
 export class DoctorService implements IDoctorService {
-    
-    
-    
+
+
+
     private readonly _doctorRepository: IDoctorRepository;
     private readonly _specialtyRepository: ISpecialtyRepository;
 
@@ -26,7 +27,16 @@ export class DoctorService implements IDoctorService {
 
 
     async getDoctorProfile(userId: string): Promise<IDoctor | null> {
-        return await this._doctorRepository.findByUserIdWithDetails(userId);
+        let doctor = await this._doctorRepository.findByUserIdWithDetails(userId);
+
+        if (!doctor) {
+
+            logger.info('Lazy creating doctor profile for user', { userId });
+            await this._doctorRepository.create({ userId } as any);
+            doctor = await this._doctorRepository.findByUserIdWithDetails(userId);
+        }
+
+        return doctor;
     }
 
     async getDoctorById(doctorId: string): Promise<IDoctor | null> {
@@ -45,11 +55,11 @@ export class DoctorService implements IDoctorService {
         let doctor = await this._doctorRepository.findByUserId(userId);
 
         if (!doctor) {
-            
+
             doctor = await this._doctorRepository.create({ userId } as any);
         }
 
-        
+
         if (!doctor.verificationStatus) {
             doctor.verificationStatus = {
                 clinic: false,
@@ -60,29 +70,29 @@ export class DoctorService implements IDoctorService {
             };
         }
 
-        
+
         const userData = data as any;
-        if (userData.userName || userData.gender || userData.phone) {
+        if (userData.username || userData.gender || userData.phone) {
             const updateFields: any = {};
-            if (userData.userName) updateFields.userName = userData.userName;
+            if (userData.username) updateFields.username = userData.username;
             if (userData.gender) updateFields.gender = userData.gender;
             if (userData.phone) updateFields.phone = userData.phone;
-            
+
             await (this._doctorRepository as any)._model.db.model('User').findByIdAndUpdate(doctor.userId, updateFields);
             // console.log(`[DoctorService] Synchronized user fields for ${userId}:`, updateFields);
         }
 
-        
+
         if (data.profile) {
             doctor.profile = { ...doctor.profile, ...data.profile } as any;
-          
+
         }
 
 
 
         if (data.clinicInfo) {
             const { address, location, ...rest } = data.clinicInfo;
-            
+
             if (!doctor.clinicInfo) {
                 doctor.clinicInfo = {
                     clinicName: '',
@@ -94,7 +104,7 @@ export class DoctorService implements IDoctorService {
 
             if (rest.clinicName !== undefined) doctor.clinicInfo.clinicName = rest.clinicName;
             if (rest.clinicPic !== undefined) doctor.clinicInfo.clinicPic = rest.clinicPic;
-            
+
             if (address) {
                 if (!doctor.clinicInfo.address) {
                     doctor.clinicInfo.address = { doorNo: '', street: '', city: '', state: '', pincode: '' };
@@ -118,7 +128,7 @@ export class DoctorService implements IDoctorService {
             }
             doctor.verificationStatus.clinic = false;
         }
-        
+
         if (data.experience) {
             doctor.experience = data.experience;
             doctor.verificationStatus.experience = false;
@@ -142,6 +152,12 @@ export class DoctorService implements IDoctorService {
             doctor.businessHours = data.businessHours as any;
             doctor.verificationStatus.businessHours = false;
             doctor.markModified('businessHours');
+            // console.log(`[DoctorService] Set businessHours on doctor object:`, JSON.stringify(doctor.businessHours));
+        }
+
+        if (data.recurringSchedules) {
+            doctor.recurringSchedules = data.recurringSchedules as any;
+            doctor.markModified('recurringSchedules');
         }
 
         if (data.profile?.specialtyId) {
@@ -156,18 +172,33 @@ export class DoctorService implements IDoctorService {
             doctor.isActive = data.isActive;
         }
 
-        
+
         doctor.markModified('verificationStatus');
         doctor.markModified('profile');
 
-        
+
         const updatedDoctor = await doctor.save();
+
+        
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            await Slot.deleteMany({
+                vetId: doctor._id,
+                date: { $gte: today },
+                isBooked: false
+            });
+            logger.info(`[DoctorService] Cleared future available slots for doctor ${doctor._id} due to profile update`);
+            // console.log(`[DoctorService] Cleared future slots for doctor ${doctor._id} to force regeneration.`);
+        } catch (error) {
+            console.error(`[DoctorService] Error clearing future slots:`, error);
+        }
 
 
 
         logger.info('Doctor profile updated successfully', { userId, fields: Object.keys(data) });
-        
-        
+
+
         return updatedDoctor;
     }
 
@@ -183,12 +214,12 @@ export class DoctorService implements IDoctorService {
 
 
     async verifyDoctor(doctorId: string, data: VerifyDoctorDto): Promise<IDoctor> {
-        
-        
+
+
         const doctor = await this._doctorRepository.findById(doctorId);
-        
-        
-        
+
+
+
         if (!doctor) {
             throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
@@ -200,25 +231,25 @@ export class DoctorService implements IDoctorService {
         if (data.isVerified !== undefined) {
             doctor.isVerified = data.isVerified;
             doctor.profileStatus = data.isVerified ? 'verified' : 'rejected';
-            
+
             if (!data.isVerified && data.rejectionReason) {
                 doctor.rejectionReason = data.rejectionReason;
             } else if (data.isVerified) {
                 doctor.rejectionReason = null;
-                
+
                 doctor.verificationStatus = {
                     clinic: true,
                     education: true,
                     experience: true,
                     certificates: true,
-                    businessHours: doctor.verificationStatus.businessHours 
+                    businessHours: doctor.verificationStatus.businessHours
                 };
             }
         } else if (data.verificationStatus) {
-           
+
             const sections = ['clinic', 'education', 'experience', 'certificates'];
             const allVerified = sections.every(s => (doctor.verificationStatus as any)[s] === true);
-            
+
             if (allVerified) {
                 doctor.isVerified = true;
                 doctor.profileStatus = 'verified';
@@ -244,25 +275,25 @@ export class DoctorService implements IDoctorService {
             throw new AppError('Profile not found. Please complete and save your basic details first.', HttpStatus.NOT_FOUND);
         }
 
-        // Validation logic
-        const errors: string[] = [];
-        
-        // Basic Profile Check
-        // if (!doctor.profile.designation) errors.push('Designation is required');
-        
        
+        const errors: string[] = [];
+
+        
+        // if (!doctor.profile.designation) errors.push('Designation is required');
+
+
         if (!doctor.clinicInfo.clinicName) errors.push('Clinic name is required');
         if (!doctor.clinicInfo.clinicPic) errors.push('Clinic picture is required');
         if (!doctor.clinicInfo.address.city) errors.push('Clinic location details are required');
 
-        
+
         if (doctor.education.length === 0) errors.push('At least one education record is required');
         if (doctor.education.some(edu => !edu.educationFile)) errors.push('Education certificates are required (PDF)');
 
         if (doctor.certificates.length === 0) errors.push('At least one certificate is required');
         if (doctor.certificates.some(cert => !cert.certificateFile)) errors.push('Certificate files are required (PDF)');
 
-        
+
 
         if (errors.length > 0) {
             throw new AppError(`Incomplete Profile: ${errors.join(', ')}`, HttpStatus.BAD_REQUEST);
@@ -270,7 +301,7 @@ export class DoctorService implements IDoctorService {
 
         doctor.profileStatus = 'under_review';
         doctor.isVerified = false;
-        
+
 
 
         return await doctor.save();
@@ -289,13 +320,13 @@ export class DoctorService implements IDoctorService {
 
     async getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string, filters?: any): Promise<{ doctors: IDoctor[], total: number }> {
         const filter: any = {};
-        
-        
+
+
         if (isVerified !== undefined) {
             filter.isVerified = isVerified;
         }
-        
-        
+
+
 
 
 
@@ -306,10 +337,10 @@ export class DoctorService implements IDoctorService {
         if (status && status !== 'all') {
             filter.profileStatus = status;
         } else if (!isVerified) {
-            
+
             filter.profileStatus = { $in: ['under_review', 'verified', 'rejected'] };
         }
-        
+
 
         if (filters) {
             if (filters.specialty) {
@@ -321,11 +352,11 @@ export class DoctorService implements IDoctorService {
             }
         }
 
-   
+
         if (search) {
-            
+
             const matchingUsers = await (this._doctorRepository as any)._model.db.model('User').find({
-                userName: { $regex: search, $options: 'i' }
+                username: { $regex: search, $options: 'i' }
             }).select('_id');
 
 
@@ -338,8 +369,8 @@ export class DoctorService implements IDoctorService {
                 { 'profile.designation': { $regex: search, $options: 'i' } },
                 { 'clinicInfo.clinicName': { $regex: search, $options: 'i' } }
             ];
-            
-           
+
+
         }
 
 
@@ -350,10 +381,10 @@ export class DoctorService implements IDoctorService {
                 gender: { $regex: `^${filters.gender}$`, $options: 'i' }
             }).select('_id');
             const genderUserIds = genderUsers.map((u: any) => u._id);
-            
+
             filter.userId = { $in: genderUserIds };
+
             
-            // If we have search-based $or for userId, we must intersect it
             if (filter.$or) {
                 const searchOr = filter.$or;
                 delete filter.$or;
@@ -363,9 +394,9 @@ export class DoctorService implements IDoctorService {
                 ];
             }
         }
-        
+
         // console.log(`[DoctorService] getAllDoctors final filter:`, JSON.stringify(filter));
-        
+
         const options = {
             skip: (page - 1) * limit,
             limit: limit,
@@ -373,7 +404,7 @@ export class DoctorService implements IDoctorService {
         };
 
         const doctors = await (this._doctorRepository as any)._model.find(filter, null, options)
-            .populate({ path: 'userId', select: 'userName email profilePic gender phone', model: 'User' })
+            .populate({ path: 'userId', select: 'username email role profilePic gender phone', model: 'User' })
             .populate({ path: 'profile.specialtyId', model: 'Specialty' });
         const total = await (this._doctorRepository as any)._model.countDocuments(filter);
 

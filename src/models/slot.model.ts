@@ -8,6 +8,7 @@ export interface ISlot extends Document {
     endTime: string;   // e.g., "09:30"
     isBooked: boolean;
     isBlocked: boolean;
+    status: 'available' | 'booked' | 'confirmed' | 'cancelled' | 'completed';
     slotType: ServiceType;
     createdAt: Date;
     updatedAt: Date;
@@ -21,10 +22,15 @@ const slotSchema = new Schema<ISlot>(
         endTime: { type: String, required: true },
         isBooked: { type: Boolean, default: false },
         isBlocked: { type: Boolean, default: false },
-        slotType: { 
-            type: String, 
-            enum: Object.values(ServiceType), 
-            default: ServiceType.NORMAL 
+        slotType: {
+            type: String,
+            enum: Object.values(ServiceType),
+            default: ServiceType.NORMAL
+        },
+        status: {
+            type: String,
+            enum: ['available', 'booked', 'confirmed', 'cancelled', 'completed'],
+            default: 'available'
         },
     },
     { timestamps: true }

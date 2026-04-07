@@ -19,6 +19,9 @@ import { AdminPetController } from '../controllers/admin/pet.controller';
 import { AppointmentRepository } from '../repositories/appointment.repository';
 import { AppointmentService } from '../services/appointment/appointment.service';
 import { AppointmentController } from '../controllers/appointment/appointment.controller';
+import { PaymentRepository } from '../repositories/payment.repository';
+import { PaymentService } from '../services/payment/payment.service';
+import { PaymentController } from '../controllers/payment/payment.controller';
 
 // Repositories
 const userRepository = new UserRepository();
@@ -27,6 +30,7 @@ const specialtyRepository = new SpecialtyRepository();
 const doctorRepository = new DoctorRepository();
 const petRepository = new PetRepository();
 const appointmentRepository = new AppointmentRepository();
+const paymentRepository = new PaymentRepository();
 
 // Services
 const jwtService = new JwtService();
@@ -36,7 +40,8 @@ const adminService = new AdminService(jwtService, specialtyRepository, userRepos
 const userService = new UserService(userRepository, otpRepository, emailService);
 const doctorService = new DoctorService(doctorRepository, specialtyRepository);
 const petService = new PetService(petRepository);
-const appointmentService = new AppointmentService(appointmentRepository, doctorRepository, petRepository);
+const paymentService = new PaymentService(paymentRepository);
+const appointmentService = new AppointmentService(appointmentRepository, doctorRepository, petRepository, paymentService);
 
 // Controllers
 const authController = new AuthController(authService);
@@ -46,6 +51,7 @@ const doctorController = new DoctorController(doctorService);
 const userPetController = new UserPetController(petService);
 const adminPetController = new AdminPetController(petService);
 const appointmentController = new AppointmentController(appointmentService);
+const paymentController = new PaymentController(paymentService);
 
 export {
     authController,
@@ -55,4 +61,5 @@ export {
     userPetController,
     adminPetController,
     appointmentController,
+    paymentController,
 };

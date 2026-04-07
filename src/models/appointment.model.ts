@@ -14,7 +14,7 @@ export interface IAppointment extends Document {
     appointmentStartTime: string;
     appointmentEndTime: string;
     mode: 'online' | 'offline';
-    status: AppointmentStatus;
+    status: AppointmentStatus | 'booked' | 'confirmed' | 'cancelled' | 'completed';
     cancellation?: {
         cancelledBy: mongoose.Types.ObjectId;
         cancelReason: string;
@@ -30,6 +30,10 @@ export interface IAppointment extends Document {
     };
     appointmentId: string;
     delayStatus: 'none' | 'slight-delay' | 'major-delay';
+    paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+    paymentMethod: 'cash' | 'razorpay' | 'wallet';
+    transactionID?: string;
+    totalAmount: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -40,10 +44,10 @@ const appointmentSchema = new Schema<IAppointment>(
         petId: { type: Schema.Types.ObjectId, ref: 'Pet', required: true },
         doctorId: { type: Schema.Types.ObjectId, ref: 'Doctor', required: true },
         slotId: { type: Schema.Types.ObjectId, ref: 'Slot', required: true },
-        serviceType: { 
-            type: String, 
-            enum: Object.values(ServiceType), 
-            required: true 
+        serviceType: {
+            type: String,
+            enum: Object.values(ServiceType),
+            required: true
         },
         problemDescription: { type: String, required: true },
         symptoms: { type: [String], default: [] },
@@ -51,10 +55,10 @@ const appointmentSchema = new Schema<IAppointment>(
         appointmentStartTime: { type: String, required: true },
         appointmentEndTime: { type: String, required: true },
         mode: { type: String, enum: ['online', 'offline'], default: 'offline' },
-        status: { 
-            type: String, 
-            enum: Object.values(AppointmentStatus), 
-            default: AppointmentStatus.BOOKED 
+        status: {
+            type: String,
+            enum: Object.values(AppointmentStatus),
+            default: AppointmentStatus.BOOKED
         },
         cancellation: {
             cancelledBy: { type: Schema.Types.ObjectId, ref: 'User' },
@@ -70,11 +74,23 @@ const appointmentSchema = new Schema<IAppointment>(
             vetCheckOutTime: { type: Date }
         },
         appointmentId: { type: String, unique: true },
-        delayStatus: { 
-            type: String, 
-            enum: ['none', 'slight-delay', 'major-delay'], 
-            default: 'none' 
+        delayStatus: {
+            type: String,
+            enum: ['none', 'slight-delay', 'major-delay'],
+            default: 'none'
         },
+        paymentStatus: {
+            type: String,
+            enum: ['PENDING', 'PAID', 'FAILED', 'REFUNDED'],
+            default: 'PENDING'
+        },
+        paymentMethod: {
+            type: String,
+            enum: ['cash', 'razorpay', 'wallet', 'cod'],
+            default: 'cash'
+        },
+        transactionID: { type: String },
+        totalAmount: { type: Number, default: 0 },
     },
     { timestamps: true }
 );
