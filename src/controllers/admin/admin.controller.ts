@@ -68,7 +68,7 @@ console.log("afaf",result)
                 data: {
                     user: {
                         id: result.id,
-                        userName: result.email,
+                        username: result.email,
                         email: result.email,
                         role: result.role,
                     },
@@ -250,7 +250,7 @@ console.log("afaf",result)
             //     id: profile?._id,
             //     hasUserId: !!profile?.userId,
             //     userIdIsObject: typeof profile?.userId === 'object',
-            //     userName: profile?.userId?.userName,
+            //     username: profile?.userId?.username,
             //     specialtyId: profile?.profile?.specialtyId,
             //     specialtyName: profile?.profile?.specialtyId?.name
             // });

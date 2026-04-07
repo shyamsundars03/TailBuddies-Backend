@@ -56,7 +56,7 @@ export class UserService implements IUserService {
         }
 
        
-        if (data.userName) user.userName = data.userName;
+        if (data.username) user.username = data.username;
         if (data.phone !== undefined) user.phone = data.phone;
         if (data.gender) user.gender = data.gender;
         if (data.address !== undefined) user.address = data.address;

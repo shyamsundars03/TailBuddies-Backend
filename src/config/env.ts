@@ -22,6 +22,8 @@ interface EnvConfig {
   jwtAccessExpiry: string;
   jwtRefreshExpiry: string;
   jwtRefreshMaxAge: number;
+  razorpayKeyId: string;
+  razorpayKeySecret: string;
 }
 
 class EnvValidator {
@@ -47,9 +49,11 @@ class EnvValidator {
       frontendUrl: process.env.FRONTEND_URL,
        dbName: process.env.MONGO_URI ? 
     process.env.MONGO_URI.split('/').pop()?.split('?')[0] : undefined,
-      jwtAccessExpiry: process.env.JWT_ACCESS_EXPIRY || '15m',
+      jwtAccessExpiry: process.env.JWT_ACCESS_EXPIRY || '30m',
       jwtRefreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
       jwtRefreshMaxAge: this.parseDurationToMs(process.env.JWT_REFRESH_EXPIRY || '7d'),
+      razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+      razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
     };
   }
 

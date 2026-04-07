@@ -14,4 +14,8 @@ export interface IAppointmentService {
     checkIn(appointmentId: string, role: 'owner' | 'doctor'): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
     checkOut(appointmentId: string, role: 'owner' | 'doctor'): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
     getPatientsByDoctor(doctorId: string, page: number, limit: number, search?: string): Promise<{ success: boolean; data?: any[]; total?: number; message?: string }>;
+    getDoctorStats(doctorId: string): Promise<{ success: boolean; stats?: any; message?: string }>;
+    getOwnerStats(ownerId: string): Promise<{ success: boolean; stats?: any; message?: string }>;
+    cancelPendingAppointment(appointmentId: string): Promise<{ success: boolean; message?: string }>;
+    checkSlotAvailability(appointmentId: string): Promise<{ success: boolean; available: boolean; message?: string }>;
 }

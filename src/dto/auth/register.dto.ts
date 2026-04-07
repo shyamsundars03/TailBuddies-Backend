@@ -9,7 +9,7 @@ export interface RegisterDto {
 
 export interface RegisterResponseDto {
   id: string;
-  userName: string;
+  username: string;
   email: string;
   phone: string;
   role: string;

@@ -5,4 +5,5 @@ export interface IBaseRepository<T> {
   findAll(filter?: Record<string, unknown>, options?: Record<string, unknown>): Promise<T[]>;
   update(id: string, data: Partial<T>): Promise<T | null>;
   delete(id: string): Promise<boolean>;
+  countDocuments(filter?: Record<string, unknown>): Promise<number>;
 }

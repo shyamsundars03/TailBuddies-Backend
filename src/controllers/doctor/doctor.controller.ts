@@ -203,7 +203,7 @@ export class DoctorController {
     requestVerification = async (req: Request, res: Response) => {
         try {
             const userId = (req as any).user.userId;
-            console.log(`[DoctorController] Received verification request for user: ${userId}`);
+            // console.log(`[DoctorController] Received verification request for user: ${userId}`);
             logger.info(`[DoctorController] Attempting to request verification for doctor with userId: ${userId}`);
             const updatedDoctor = await this._doctorService.requestVerification(userId);
 
@@ -237,9 +237,9 @@ export class DoctorController {
 
     getSpecialties = async (req: Request, res: Response) => {
         try {
-            console.log(`[DoctorController] Fetching specialties for user: ${(req as any).user?.userId}`);
+            // console.log(`[DoctorController] Fetching specialties for user: ${(req as any).user?.userId}`);
             const specialties = await this._doctorService.getSpecialties();
-            console.log(`[DoctorController] Found ${specialties.length} specialties`);
+            // console.log(`[DoctorController] Found ${specialties.length} specialties`);
             res.status(HttpStatus.OK).json({
                 success: true,
                 data: specialties,

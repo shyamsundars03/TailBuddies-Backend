@@ -184,7 +184,7 @@ export class AdminService implements IAdminService {
 
         if (search) {
             filter.$or = [
-                { userName: { $regex: search, $options: 'i' } },
+                { username: { $regex: search, $options: 'i' } },
                 { email: { $regex: search, $options: 'i' } }
             ];
         }

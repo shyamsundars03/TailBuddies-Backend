@@ -27,6 +27,8 @@
     "multer": "^2.1.0",
     "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^8.0.1",
+    "razorpay": "^2.9.6",
+    "rrule": "^2.8.1",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
     "zod": "^4.3.6"

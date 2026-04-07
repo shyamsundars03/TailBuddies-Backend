@@ -16,7 +16,7 @@ export class PetRepository implements IPetRepository {
 
 
     async findById(id: string): Promise<IPet | null> {
-        return await Pet.findById(id).populate('ownerId', 'userName email phone profilePic');
+        return await Pet.findById(id).populate('ownerId', 'username email phone profilePic');
     }
 
 
@@ -60,7 +60,7 @@ export class PetRepository implements IPetRepository {
 
         const skip = (page - 1) * limit;
         const [pets, total] = await Promise.all([
-            Pet.find(query).populate('ownerId', 'userName email phone profilePic').skip(skip).limit(limit).sort({ createdAt: -1 }),
+            Pet.find(query).populate('ownerId', 'username email phone profilePic').skip(skip).limit(limit).sort({ createdAt: -1 }),
             Pet.countDocuments(query)
         ]);
 

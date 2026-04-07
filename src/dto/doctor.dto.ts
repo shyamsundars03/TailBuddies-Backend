@@ -46,7 +46,19 @@ export interface UpdateDoctorProfileDto {
     businessHours?: {
         day: string;
         isWorking: boolean;
+        startTime: string;
+        endTime: string;
+        duration: string;
         slots: string[];
+    }[];
+    recurringSchedules?: {
+        id: string;
+        rrule: string;
+        dtstart: Date;
+        dtend?: Date;
+        isWorking: boolean;
+        startTime: string;
+        endTime: string;
     }[];
     appointmentDuration?: number;
     isActive?: boolean;

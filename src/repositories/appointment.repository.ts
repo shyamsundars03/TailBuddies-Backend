@@ -13,12 +13,12 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
 
   async findWithDetails(query: any): Promise<IAppointment[]> {
     return await this._model.find(query)
-      .populate('ownerId', 'userName email phone')
+      .populate('ownerId', 'username email phone')
       .populate({
         path: 'doctorId',
         populate: {
           path: 'userId',
-          select: 'userName email profilePic'
+          select: 'username email profilePic'
         }
       })
       .populate('petId', 'name species breed gender age weight picture')
@@ -33,12 +33,12 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
     const skip = (page - 1) * limit;
     const [appointments, total] = await Promise.all([
       this._model.find(query)
-        .populate('ownerId', 'userName email phone')
+        .populate('ownerId', 'username email phone')
         .populate({
           path: 'doctorId',
           populate: {
             path: 'userId',
-            select: 'userName email profilePic'
+            select: 'username email profilePic'
           }
         })
         .populate('petId', 'name species breed gender age weight picture')
