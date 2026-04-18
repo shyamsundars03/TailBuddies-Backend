@@ -188,7 +188,7 @@ export class AppointmentController {
 
 
     updateStatus = async (req: AuthRequest, res: Response): Promise<void> => {
-      
+
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -237,8 +237,9 @@ export class AppointmentController {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
             const search = req.query.search as string;
+            const status = req.query.status as string;
 
-            const result = await this._appointmentService.getAllAppointments(page, limit, search);
+            const result = await this._appointmentService.getAllAppointments(page, limit, search, status);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;
@@ -303,9 +304,9 @@ export class AppointmentController {
             );
 
 
-// console.log("backend:", result)
+            // console.log("backend:", result)
 
-logger.info(`backend:`, result)
+            logger.info(`backend:`, result)
 
 
             if (result.success) {

@@ -34,6 +34,7 @@ export interface IAppointment extends Document {
     paymentMethod: 'cash' | 'razorpay' | 'wallet';
     transactionID?: string;
     totalAmount: number;
+    prescriptionId?: mongoose.Types.ObjectId;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -91,6 +92,7 @@ const appointmentSchema = new Schema<IAppointment>(
         },
         transactionID: { type: String },
         totalAmount: { type: Number, default: 0 },
+        prescriptionId: { type: Schema.Types.ObjectId, ref: 'Prescription' }
     },
     { timestamps: true }
 );

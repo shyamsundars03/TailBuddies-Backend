@@ -119,4 +119,38 @@ export class PaymentController {
             res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
         }
     };
+
+    getAllTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 10;
+            const search = req.query.search as string;
+            const status = req.query.status as string;
+
+            const result = await this._paymentService.getAllTransactions(page, limit, search, status);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error in getAllTransactions controller', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
+
+    getTransactionDetail = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const id = req.params.id as string;
+            const result = await this._paymentService.getTransactionDetail(id);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error in getTransactionDetail controller', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
 }

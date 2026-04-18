@@ -37,4 +37,8 @@ export interface IPaymentService {
     
     // Refund logic
     refund(appointmentId: string, reason: string): Promise<{ success: boolean; message: string }>;
+
+    // Admin operations
+    getAllTransactions(page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; transactions?: IWalletTransaction[]; total?: number; message?: string }>;
+    getTransactionDetail(id: string): Promise<{ success: boolean; transaction?: IWalletTransaction; message?: string }>;
 }

@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 import { Appointment } from '../../models/appointment.model';
 import { AppointmentStatus } from '../../enums/appointment-status.enum';
 import { Slot } from '../../models/slot.model';
+import { IWalletTransaction } from '../../models/wallet-transaction.model';
 
 export class PaymentService implements IPaymentService {
     private razorpay: Razorpay;
@@ -199,7 +200,7 @@ export class PaymentService implements IPaymentService {
             // Deduct balance
             await this._paymentRepository.updateWalletBalance(userId, amount, 'debit', session);
 
-            // Create record
+            // Record transaction
             const internalPaymentId = `WAL_${Date.now()}_${appointmentId.toString().slice(-4)}`;
             const payment = await this._paymentRepository.createPayment({
                 paymentID: internalPaymentId,
@@ -213,6 +214,15 @@ export class PaymentService implements IPaymentService {
                 paymentDate: new Date()
             }, session);
 
+            // Fetch appointment for transaction details
+            const appointment = await Appointment.findById(appointmentId).session(session);
+            if (!appointment) throw new Error('Appointment not found');
+
+            const slot = await Slot.findById(appointment.slotId).session(session);
+            if (!slot || slot.isBooked) {
+                throw new Error('Slot is no longer available');
+            }
+
             // Create wallet transaction
             await this._paymentRepository.createWalletTransaction({
                 transactionID: internalPaymentId,
@@ -221,17 +231,10 @@ export class PaymentService implements IPaymentService {
                 source: 'appointment-payment' as any,
                 amount: amount,
                 paymentID: payment._id as mongoose.Types.ObjectId,
-                message: `Payment for appointment ${appointmentId}`
+                appointmentID: appointment._id as mongoose.Types.ObjectId,
+                humanReadableId: appointment.appointmentId,
+                message: `Payment for appointment ${appointment.appointmentId}`
             }, session);
-
-            // Update appointment status to booked
-            const appointment = await Appointment.findById(appointmentId).session(session);
-            if (!appointment) throw new Error('Appointment not found');
-
-            const slot = await Slot.findById(appointment.slotId).session(session);
-            if (!slot || slot.isBooked) {
-                throw new Error('Slot is no longer available');
-            }
 
             // Lock the slot now (deferred from creation)
             slot.isBooked = true;
@@ -378,8 +381,10 @@ export class PaymentService implements IPaymentService {
                 transactionID: `REF_${Date.now()}`,
                 walletID: wallet._id,
                 type: 'credit',
-                source: 'refund',
+                source: 'refund' as any,
                 amount: amount,
+                appointmentID: appointment._id as mongoose.Types.ObjectId,
+                humanReadableId: appointment.appointmentId,
                 message: `Refund for appointment ${appointment.appointmentId}: ${reason}`
             }, session);
 
@@ -395,6 +400,29 @@ export class PaymentService implements IPaymentService {
             return { success: false, message: error.message };
         } finally {
             session.endSession();
+        }
+    }
+
+    async getAllTransactions(page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; transactions?: IWalletTransaction[]; total?: number; message?: string }> {
+        try {
+            const { transactions, total } = await this._paymentRepository.findAllWalletTransactions(page, limit, search, status);
+            return { success: true, transactions, total };
+        } catch (error: any) {
+            logger.error('Error fetching admin transactions', { error: error.message });
+            return { success: false, message: 'Failed to fetch admin transactions' };
+        }
+    }
+
+    async getTransactionDetail(id: string): Promise<{ success: boolean; transaction?: IWalletTransaction; message?: string }> {
+        try {
+            const transaction = await this._paymentRepository.getTransactionById(id);
+            if (!transaction) {
+                return { success: false, message: 'Transaction not found' };
+            }
+            return { success: true, transaction };
+        } catch (error: any) {
+            logger.error('Error fetching transaction detail', { error: error.message });
+            return { success: false, message: 'Failed to fetch transaction detail' };
         }
     }
 }

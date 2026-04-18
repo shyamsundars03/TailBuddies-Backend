@@ -55,4 +55,47 @@ export class PaymentRepository implements IPaymentRepository {
         ]);
         return { transactions, total };
     }
+
+    async findAllWalletTransactions(page: number, limit: number, search?: string, status?: string): Promise<{ transactions: IWalletTransaction[], total: number }> {
+        const skip = (page - 1) * limit;
+        const query: any = {};
+
+        if (status) {
+            if (status.toLowerCase() === 'paid') {
+                query.source = 'appointment-payment';
+            } else if (status.toLowerCase() === 'refunded') {
+                query.source = { $in: ['consultation-refund', 'prescription-refund', 'refund'] };
+            }
+        }
+
+        const [transactions, total] = await Promise.all([
+            WalletTransaction.find(query)
+                .populate({
+                    path: 'walletID',
+                    populate: { path: 'userId', select: 'username email profilePic' }
+                })
+                .populate('appointmentID')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            WalletTransaction.countDocuments(query)
+        ]);
+        return { transactions, total };
+    }
+
+    async getTransactionById(id: string): Promise<IWalletTransaction | null> {
+        return await WalletTransaction.findById(id)
+            .populate({
+                path: 'walletID',
+                populate: { path: 'userId', select: 'username email profilePic' }
+            })
+            .populate({
+                path: 'appointmentID',
+                populate: [
+                    { path: 'doctorId', populate: { path: 'userId', select: 'username email profilePic' } },
+                    { path: 'petId' },
+                    { path: 'ownerId', select: 'username email profilePic' }
+                ]
+            });
+    }
 }
