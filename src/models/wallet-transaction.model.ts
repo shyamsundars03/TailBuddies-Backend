@@ -15,6 +15,8 @@ export interface IWalletTransaction extends Document {
     source: WalletTransactionSource;
     amount: number;
     paymentID?: mongoose.Types.ObjectId; // Reference to the Payment document
+    appointmentID?: mongoose.Types.ObjectId; // Reference to the Appointment document
+    humanReadableId?: string; // Human readable Appointment ID (e.g. API12345)
     message?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -32,6 +34,8 @@ const walletTransactionSchema = new Schema<IWalletTransaction>(
         },
         amount: { type: Number, required: true },
         paymentID: { type: Schema.Types.ObjectId, ref: 'Payment' },
+        appointmentID: { type: Schema.Types.ObjectId, ref: 'Appointment' },
+        humanReadableId: { type: String },
         message: { type: String }
     },
     { timestamps: true }

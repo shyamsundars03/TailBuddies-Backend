@@ -22,6 +22,11 @@ import { AppointmentController } from '../controllers/appointment/appointment.co
 import { PaymentRepository } from '../repositories/payment.repository';
 import { PaymentService } from '../services/payment/payment.service';
 import { PaymentController } from '../controllers/payment/payment.controller';
+import { IPdfService } from '../services/interfaces/IPdfService';
+import { PdfService } from '../services/pdf.service';
+import { PrescriptionRepository } from '../repositories/prescription.repository';
+import { PrescriptionService } from '../services/prescription.service';
+import { PrescriptionController } from '../controllers/prescription.controller';
 
 // Repositories
 const userRepository = new UserRepository();
@@ -31,6 +36,7 @@ const doctorRepository = new DoctorRepository();
 const petRepository = new PetRepository();
 const appointmentRepository = new AppointmentRepository();
 const paymentRepository = new PaymentRepository();
+const prescriptionRepository = new PrescriptionRepository();
 
 // Services
 const jwtService = new JwtService();
@@ -41,7 +47,9 @@ const userService = new UserService(userRepository, otpRepository, emailService)
 const doctorService = new DoctorService(doctorRepository, specialtyRepository);
 const petService = new PetService(petRepository);
 const paymentService = new PaymentService(paymentRepository);
-const appointmentService = new AppointmentService(appointmentRepository, doctorRepository, petRepository, paymentService);
+const pdfService = new PdfService();
+const prescriptionService = new PrescriptionService(prescriptionRepository, appointmentRepository, doctorRepository, pdfService);
+const appointmentService = new AppointmentService(appointmentRepository, doctorRepository, petRepository, paymentService, prescriptionRepository);
 
 // Controllers
 const authController = new AuthController(authService);
@@ -52,6 +60,7 @@ const userPetController = new UserPetController(petService);
 const adminPetController = new AdminPetController(petService);
 const appointmentController = new AppointmentController(appointmentService);
 const paymentController = new PaymentController(paymentService);
+const prescriptionController = new PrescriptionController(prescriptionService);
 
 export {
     authController,
@@ -62,4 +71,5 @@ export {
     adminPetController,
     appointmentController,
     paymentController,
+    prescriptionController,
 };

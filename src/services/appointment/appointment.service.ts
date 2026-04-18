@@ -4,6 +4,7 @@ import { IDoctorRepository } from '../../repositories/interfaces/IDoctorReposito
 import { IPetRepository } from '../../repositories/interfaces/IPetRepository';
 import { IPaymentService } from '../interfaces/IPaymentService';
 import Slot from '../../models/slot.model';
+import { IPrescriptionRepository } from '../../repositories/interfaces/IPrescriptionRepository';
 import { IAppointment, Appointment } from '../../models/appointment.model';
 import { ISlot } from '../../models/slot.model';
 import { AppointmentStatus } from '../../enums/appointment-status.enum';
@@ -16,17 +17,20 @@ export class AppointmentService implements IAppointmentService {
     private readonly _doctorRepository: IDoctorRepository;
     private readonly _petRepository: IPetRepository;
     private readonly _paymentService: IPaymentService;
+    private readonly _prescriptionRepository: IPrescriptionRepository;
 
     constructor(
         appointmentRepository: IAppointmentRepository,
         doctorRepository: IDoctorRepository,
         petRepository: IPetRepository,
-        paymentService: IPaymentService
+        paymentService: IPaymentService,
+        prescriptionRepository: IPrescriptionRepository
     ) {
         this._appointmentRepository = appointmentRepository;
         this._doctorRepository = doctorRepository;
         this._petRepository = petRepository;
         this._paymentService = paymentService;
+        this._prescriptionRepository = prescriptionRepository;
     }
 
     async createAppointment(data: any): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
@@ -54,6 +58,27 @@ export class AppointmentService implements IAppointmentService {
             const slot = await Slot.findById(data.slotId).session(session);
             if (!slot || slot.isBooked || slot.isBlocked) {
                 throw new Error('Slot is no longer available');
+            }
+
+            // Validate that the slot is not in the past
+            const appointmentDate = new Date(data.appointmentDate);
+            const now = new Date();
+
+            // Set both to midnight for date comparison
+            const appDateOnly = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
+            const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            if (appDateOnly < todayDateOnly) {
+                throw new Error('Cannot book an appointment in the past');
+            }
+
+            if (appDateOnly.getTime() === todayDateOnly.getTime()) {
+                const [startHour, startMin] = slot.startTime.split(':').map(Number);
+                const slotStartTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startHour, startMin);
+
+                if (slotStartTime < now) {
+                    throw new Error('This slot has already passed for today');
+                }
             }
 
             const randomDigits = Math.floor(10000 + Math.random() * 90000).toString();
@@ -131,9 +156,10 @@ export class AppointmentService implements IAppointmentService {
         }
     }
 
-    async getAllAppointments(page: number, limit: number, search?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }> {
+    async getAllAppointments(page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }> {
         try {
             const query: any = {};
+            if (status) query.status = status;
             if (search) {
                 query.$or = [
                     { 'appointmentId': { $regex: search, $options: 'i' } },
@@ -169,10 +195,10 @@ export class AppointmentService implements IAppointmentService {
 
             if (status === AppointmentStatus.CANCELLED) {
                 await Slot.findByIdAndUpdate(appointment.slotId, { isBooked: false, status: 'available' });
-                
+
                 // Trigger auto-refund if payment was made via Razorpay or Wallet
                 if (appointment.paymentStatus === 'PAID') {
-                     await this._paymentService.refund(appointment._id.toString(), 'Appointment cancelled by doctor');
+                    await this._paymentService.refund(appointment._id.toString(), 'Appointment cancelled by doctor');
                 }
             }
 
@@ -206,7 +232,7 @@ export class AppointmentService implements IAppointmentService {
 
             if (appointment.status === AppointmentStatus.CANCELLED) {
                 await Slot.findByIdAndUpdate(appointment.slotId, { isBooked: false, status: 'available' }, { session });
-                
+
                 // Trigger refund if paid
                 if ((appointment as any).paymentStatus === 'PAID') {
                     await this._paymentService.refund(appointment._id.toString(), 'Appointment cancelled');
@@ -241,9 +267,9 @@ export class AppointmentService implements IAppointmentService {
             const doctor = await this._doctorRepository.findById(doctorId);
             if (!doctor) throw new Error('Doctor not found');
 
-            
+
             if (doctor.recurringSchedules && doctor.recurringSchedules.length > 0) {
-                const schedule = doctor.recurringSchedules[0]; 
+                const schedule = doctor.recurringSchedules[0];
                 const dtstart = new Date(schedule.dtstart);
                 dtstart.setHours(0, 0, 0, 0);
 
@@ -270,16 +296,16 @@ export class AppointmentService implements IAppointmentService {
                 }
             }
 
-            
+
             const dayOfWeek = requestedDate.toLocaleDateString('en-US', { weekday: 'long' });
             const businessDay = doctor.businessHours.find(bh => bh.day === dayOfWeek);
-            
+
             if (businessDay && !businessDay.isWorking) {
                 logger.info(`[AppointmentService] Doctor is not working on ${dayOfWeek}`);
                 return { success: true, data: [], message: 'Doctor is not working on this day' };
             }
 
-        
+
             let allSlots = await Slot.find({
                 vetId: doctor._id,
                 date: { $gte: searchStart, $lte: searchEnd }
@@ -296,21 +322,21 @@ export class AppointmentService implements IAppointmentService {
 
             if (slots.length > 0) {
                 logger.info(`[AppointmentService] Found ${slots.length} relevant slots (out of ${allSlots.length} in range).`);
-                
+
                 const availableSlots = slots.filter(s => {
                     if (s.isBooked || s.isBlocked) {
-                         logger.debug(`Filtering out slot ${s.startTime}: booked=${s.isBooked}, blocked=${s.isBlocked}`);
-                         return false;
+                        logger.debug(`Filtering out slot ${s.startTime}: booked=${s.isBooked}, blocked=${s.isBlocked}`);
+                        return false;
                     }
                     return true;
                 });
-                
+
                 return { success: true, data: availableSlots };
             }
 
-            
+
             logger.info(`[AppointmentService] No slots found for ${dateStr}. Starting generation...`);
-            
+
             const PLATFORM_BUFFER = 10;
             const newSlotsData = [];
 
@@ -325,7 +351,7 @@ export class AppointmentService implements IAppointmentService {
                         const [h, m] = sTime.split(':').map(Number);
                         const startTotalMinutes = h * 60 + m;
                         const endTotalMinutes = startTotalMinutes + occDuration;
-                        
+
                         const nextH = Math.floor(endTotalMinutes / 60).toString().padStart(2, '0');
                         const nextM = (endTotalMinutes % 60).toString().padStart(2, '0');
                         const endTime = `${nextH}:${nextM}`;
@@ -345,7 +371,7 @@ export class AppointmentService implements IAppointmentService {
                     logger.info(`[AppointmentService] Generating slots using time-range loop (${businessDay.startTime} - ${businessDay.endTime})`);
                     const occStartTime = businessDay.startTime || "09:00";
                     const occEndTime = businessDay.endTime || "17:00";
-                    
+
                     const [startH, startM] = occStartTime.split(':').map(Number);
                     const [endH, endM] = occEndTime.split(':').map(Number);
 
@@ -453,7 +479,7 @@ export class AppointmentService implements IAppointmentService {
 
     async autoCancelMissedAppointments(): Promise<{ success: boolean; cancelledCount: number }> {
         try {
-            const GRACE_PERIOD = 10;
+            const GRACE_PERIOD = 5;
             const now = new Date();
 
 
@@ -479,22 +505,39 @@ export class AppointmentService implements IAppointmentService {
                     const hasDoctorCheckedIn = !!appt.checkIn?.vetCheckInTime;
 
                     if (!hasOwnerCheckedIn || !hasDoctorCheckedIn) {
-                        appt.status = 'cancelled';
+                        let shouldRefund = false;
+                        let cancelReason = '';
+
+                        if (!hasOwnerCheckedIn && !hasDoctorCheckedIn) {
+                            shouldRefund = true;
+                            cancelReason = 'Missed appointment: Both parties failed to check in within grace period.';
+                        } else if (hasOwnerCheckedIn && !hasDoctorCheckedIn) {
+                            shouldRefund = true;
+                            cancelReason = 'Missed appointment: Doctor failed to check in within grace period.';
+                        } else if (!hasOwnerCheckedIn && hasDoctorCheckedIn) {
+                            shouldRefund = false;
+                            cancelReason = 'Missed appointment: Owner failed to check in within grace period (No refund applicable).';
+                        }
+
+                        appt.status = AppointmentStatus.CANCELLED;
                         appt.cancellation = {
                             cancelledBy: null as any,
-                            cancelReason: 'Missed appointment: delayed beyond platform policy (10 mins grace period exceeded)',
+                            cancelReason: cancelReason,
                             cancelledAt: new Date()
                         };
                         await appt.save();
 
-
-
-
-
-
+                        // Trigger refund if applicable
+                        if (shouldRefund && appt.paymentStatus === 'PAID') {
+                            try {
+                                await this._paymentService.refund(appt._id.toString(), cancelReason);
+                            } catch (error) {
+                                logger.error('Auto-refund failed:', error);
+                            }
+                        }
 
                         if (appt.slotId) {
-                            await Slot.findByIdAndUpdate(appt.slotId._id, { status: 'cancelled', isBooked: false });
+                            await Slot.findByIdAndUpdate(appt.slotId._id, { status: 'available', isBooked: false });
                         }
                         cancelledCount++;
                     }
@@ -521,18 +564,104 @@ export class AppointmentService implements IAppointmentService {
 
     async checkIn(appointmentId: string, role: 'owner' | 'doctor'): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
         try {
-            const appointment = await this._appointmentRepository.findById(appointmentId);
-            if (!appointment) throw new Error('Appointment not found');
+            const appointment = await this._appointmentRepository.findWithDetails({ _id: appointmentId });
+            if (!appointment || appointment.length === 0) throw new Error('Appointment not found');
+            const appt = appointment[0];
 
             const now = new Date();
-            if (role === 'owner') {
-                appointment.checkIn = { ...appointment.checkIn, ownerCheckInTime: now };
-            } else {
-                appointment.checkIn = { ...appointment.checkIn, vetCheckInTime: now };
+            const [startHour, startMin] = appt.appointmentStartTime.split(':').map(Number);
+            const apptStart = new Date(appt.appointmentDate);
+            apptStart.setHours(startHour, startMin, 0, 0);
+
+            const graceEnd = new Date(apptStart.getTime() + 5 * 60 * 1000);
+
+            // 1. Check if it's too early
+            if (now < apptStart) {
+                // Allow a bit of leeway? User says "within 5 mins of start time" -> usually means [start, start+5]
+                // But often users expect to be able to check in a bit earlier. 
+                // However, the rule says 9:00-9:05. So strictly after 9:00.
+                throw new Error('Appointment has not started yet');
             }
 
-            await appointment.save();
-            return { success: true, data: appointment };
+            // 2. Check if too late
+            if (now > graceEnd) {
+                const hasOwnerCheckedIn = !!appt.checkIn?.ownerCheckInTime;
+                const hasDoctorCheckedIn = !!appt.checkIn?.vetCheckInTime;
+
+                let shouldRefund = false;
+                let cancelReason = '';
+
+                if (role === 'doctor') {
+                    // If doctor tries to check in late, we refund because either both missed or only doctor missed.
+                    shouldRefund = true;
+                    cancelReason = !hasOwnerCheckedIn
+                        ? 'Consultation cancelled: Both parties failed to check in within grace period.'
+                        : 'Consultation cancelled: Doctor failed to check in within grace period.';
+                } else {
+                    // If owner tries to check in late, they only get a refund if the doctor ALSO hasn't checked in yet.
+                    if (!hasDoctorCheckedIn) {
+                        shouldRefund = true;
+                        cancelReason = 'Consultation cancelled: Both parties failed to check in within grace period.';
+                    } else {
+                        shouldRefund = false;
+                        cancelReason = 'Consultation cancelled: Owner failed to check in within grace period (No refund applicable).';
+                    }
+                }
+
+                // Auto cancel if too late
+                appt.status = AppointmentStatus.CANCELLED;
+                appt.cancellation = {
+                    cancelledBy: null as any, // System policy
+                    cancelReason: cancelReason,
+                    cancelledAt: new Date()
+                };
+                await appt.save();
+
+                // Unlock the slot
+                if (appt.slotId) {
+                    await Slot.findByIdAndUpdate(appt.slotId, {
+                        isBooked: false,
+                        status: 'available'
+                    });
+                }
+
+                // Trigger refund if applicable
+                if (shouldRefund && appt.paymentStatus === 'PAID') {
+                    try {
+                        await this._paymentService.refund(appt._id.toString(), cancelReason);
+                    } catch (refundError) {
+                        logger.error('Failed to trigger automatic refund during late check-in:', refundError);
+                    }
+                }
+
+                throw new Error(cancelReason);
+            }
+
+            // 3. Doctor specific enforcement: check for pending prescriptions for PREVIOUS completed slots TODAY
+            if (role === 'doctor') {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const previousAppointments = await Appointment.find({
+                    doctorId: appt.doctorId,
+                    appointmentDate: { $gte: today, $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000) },
+                    status: AppointmentStatus.COMPLETED,
+                    prescriptionId: { $exists: false }
+                });
+
+                if (previousAppointments.length > 0) {
+                    throw new Error('Prescription not filled for a previous completed slot today. Blocked check-in until completed.');
+                }
+            }
+
+            if (role === 'owner') {
+                appt.checkIn = { ...appt.checkIn, ownerCheckInTime: now };
+            } else {
+                appt.checkIn = { ...appt.checkIn, vetCheckInTime: now };
+            }
+
+            await appt.save();
+            return { success: true, data: appt };
         } catch (error: any) {
             return { success: false, message: error.message };
         }
@@ -540,19 +669,36 @@ export class AppointmentService implements IAppointmentService {
 
     async checkOut(appointmentId: string, role: 'owner' | 'doctor'): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
         try {
-            const appointment = await this._appointmentRepository.findById(appointmentId);
-            if (!appointment) throw new Error('Appointment not found');
+            const appointment = await this._appointmentRepository.findWithDetails({ _id: appointmentId });
+            if (!appointment || appointment.length === 0) throw new Error('Appointment not found');
+            const appt = appointment[0];
 
             const now = new Date();
-            if (role === 'owner') {
-                appointment.checkOut = { ...appointment.checkOut, ownerCheckOutTime: now };
-            } else {
-                appointment.checkOut = { ...appointment.checkOut, vetCheckOutTime: now };
-                appointment.status = AppointmentStatus.COMPLETED;
+            const [endHour, endMin] = appt.appointmentEndTime.split(':').map(Number);
+            const apptEnd = new Date(appt.appointmentDate);
+            apptEnd.setHours(endHour, endMin, 0, 0);
+
+            const manualCheckOutStart = new Date(apptEnd.getTime() - 5 * 60 * 1000);
+
+            // Manual checkout only after 25 mins (for 30 min slot)
+            if (now < manualCheckOutStart) {
+                throw new Error('Cannot checkout early. Please attend at least 25 minutes of the consultation.');
             }
 
-            await appointment.save();
-            return { success: true, data: appointment };
+            if (role === 'owner') {
+                appt.checkOut = { ...appt.checkOut, ownerCheckOutTime: now };
+            } else {
+                appt.checkOut = { ...appt.checkOut, vetCheckOutTime: now };
+                // If vet checks out, status becomes completed? No, usually after prescription.
+                // But the user said "after this checkout the appointment should be marked as completed with prescription loaded"
+                // So if prescription is there, mark as completed.
+                if (appt.prescriptionId) {
+                    appt.status = AppointmentStatus.COMPLETED;
+                }
+            }
+
+            await appt.save();
+            return { success: true, data: appt };
         } catch (error: any) {
             return { success: false, message: error.message };
         }
@@ -671,9 +817,9 @@ export class AppointmentService implements IAppointmentService {
                 this._appointmentRepository.countDocuments({ ownerId, status: AppointmentStatus.BOOKED }),
                 this._appointmentRepository.countDocuments({ ownerId, status: AppointmentStatus.CONFIRMED }),
                 this._appointmentRepository.countDocuments({ ownerId, status: AppointmentStatus.PAYMENT_PENDING }),
-                this._appointmentRepository.countDocuments({ 
-                    ownerId, 
-                    status: { $in: [AppointmentStatus.CANCEL_REQUEST, AppointmentStatus.CANCELLED] } 
+                this._appointmentRepository.countDocuments({
+                    ownerId,
+                    status: { $in: [AppointmentStatus.CANCEL_REQUEST, AppointmentStatus.CANCELLED] }
                 }),
                 this._appointmentRepository.countDocuments({ ownerId, status: AppointmentStatus.COMPLETED })
             ]);
@@ -695,9 +841,9 @@ export class AppointmentService implements IAppointmentService {
 
     private async unlockSlot(slotId: string): Promise<void> {
         try {
-            await Slot.findByIdAndUpdate(slotId, { 
-                isBooked: false, 
-                status: 'available' 
+            await Slot.findByIdAndUpdate(slotId, {
+                isBooked: false,
+                status: 'available'
             });
             logger.info('Slot unlocked successfully', { slotId });
         } catch (error: any) {
@@ -732,31 +878,45 @@ export class AppointmentService implements IAppointmentService {
     private async confirmBooking(appointmentId: string, slotId: string, session: mongoose.ClientSession): Promise<void> {
         const slot = await Slot.findById(slotId).session(session);
         if (!slot || slot.isBooked) {
-             throw new Error('Slot is no longer available');
+            throw new Error('Slot is no longer available');
         }
 
         slot.isBooked = true;
         slot.status = 'booked';
         await slot.save({ session });
 
-        await Appointment.findByIdAndUpdate(appointmentId, { 
-            status: AppointmentStatus.BOOKED 
+        await Appointment.findByIdAndUpdate(appointmentId, {
+            status: AppointmentStatus.BOOKED
         }, { session });
-        
+
         logger.info('Appointment confirmed and slot locked', { appointmentId, slotId });
     }
     async checkSlotAvailability(id: string): Promise<{ success: boolean; available: boolean; message?: string }> {
         try {
             const appointment = await this._appointmentRepository.findById(id);
-            if (!appointment) throw new Error('Appointment not found');
+            if (!appointment) {
+                logger.warn('checkSlotAvailability: Appointment not found', { id });
+                throw new Error('Appointment not found');
+            }
 
             const slot = await Slot.findById(appointment.slotId);
-            if (!slot) throw new Error('Slot record not found');
+            if (!slot) {
+                logger.warn('checkSlotAvailability: Slot record not found', { appointmentId: id, slotId: appointment.slotId });
+                throw new Error('Slot record not found');
+            }
 
             const isAvailable = !slot.isBooked && !slot.isBlocked;
-            
-            return { 
-                success: true, 
+
+            logger.info('checkSlotAvailability check:', {
+                appointmentId: id,
+                slotId: slot._id,
+                isBooked: slot.isBooked,
+                isBlocked: slot.isBlocked,
+                isAvailable
+            });
+
+            return {
+                success: true,
                 available: isAvailable,
                 message: isAvailable ? 'Slot is available' : 'Slot has already been taken'
             };

@@ -17,4 +17,6 @@ export interface IPaymentRepository {
     // Wallet Transaction
     createWalletTransaction(transactionData: Partial<IWalletTransaction>, session?: ClientSession): Promise<IWalletTransaction>;
     getWalletTransactions(walletId: string, page: number, limit: number): Promise<{ transactions: IWalletTransaction[], total: number }>;
+    findAllWalletTransactions(page: number, limit: number, search?: string, status?: string): Promise<{ transactions: IWalletTransaction[], total: number }>;
+    getTransactionById(id: string): Promise<IWalletTransaction | null>;
 }

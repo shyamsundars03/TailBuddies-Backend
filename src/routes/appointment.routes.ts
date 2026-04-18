@@ -33,7 +33,7 @@ router.patch('/:id/status', authMiddleware, appointmentController.updateStatus);
 router.post('/:id/cancel', authMiddleware, appointmentController.cancel);
 
 // Check-in/out
-// router.post('/:id/check-in', authMiddleware, appointmentController.checkIn);
-// router.post('/:id/check-out', authMiddleware, appointmentController.checkOut);
+router.post('/:id/check-in', authMiddleware, appointmentController.checkIn);
+router.post('/:id/check-out', authMiddleware, appointmentController.checkOut);
 
 export default router;

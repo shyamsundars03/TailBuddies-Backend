@@ -13,6 +13,8 @@ import userRoutes from './routes/user.routes';
 import doctorRoutes from './routes/doctor.routes';
 import appointmentRoutes from './routes/appointment.routes';
 import paymentRoutes from './routes/payment.routes';
+import prescriptionRoutes from './routes/prescription.routes';
+import chatRoutes from './routes/chat.routes';
 
 const app = express();
 
@@ -42,6 +44,8 @@ app.use('/api/user', userRoutes);
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/prescriptions', prescriptionRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api', routes);
 
 

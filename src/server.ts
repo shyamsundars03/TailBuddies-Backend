@@ -4,22 +4,29 @@ import logger from './logger';
 import { connectDB, disconnectDB } from './config/database';
 import mongoose from 'mongoose';
 
-const PORT = env.port;
+import http from 'http';
+import { Server } from 'socket.io';
+import { SocketService } from './services/socket.service';
 
+const PORT = env.port;
 
 const startServer = async () => {
   try {
-    
-
     await connectDB();
-    
-    
-    const server = app.listen(PORT, () => {
 
+    const httpServer = http.createServer(app);
+    const io = new Server(httpServer, {
+      cors: {
+        origin: env.frontendUrl || 'http://localhost:3000',
+        credentials: true,
+      },
+    });
 
+    // Initialize SocketService
+    SocketService.initialize(io);
+
+    const server = httpServer.listen(PORT, () => {
       logger.info(`🚀 Server started on port ${PORT}`);
-
-
       logger.info(`
     🚀 TailBuddies API Server Started!
     📍 Environment: ${env.nodeEnv}
@@ -28,9 +35,6 @@ const startServer = async () => {
     🕒 Time: ${new Date().toISOString()}
     📡 URL: http://localhost:${PORT}
       `);
-
-
-
     });
 
     // Graceful shutdown

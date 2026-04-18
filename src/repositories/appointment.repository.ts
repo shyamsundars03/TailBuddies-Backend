@@ -22,7 +22,7 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
         }
       })
       .populate('petId', 'name species breed gender age weight picture')
-      .sort({ appointmentDate: -1, appointmentStartTime: -1 }); // Recently booked first
+      .sort({ createdAt: -1 }); // Recently created first
   }
 
 
@@ -42,7 +42,7 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
           }
         })
         .populate('petId', 'name species breed gender age weight picture')
-        .sort({ appointmentDate: -1, appointmentStartTime: -1 })
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
       this._model.countDocuments(query)
