@@ -33,16 +33,32 @@ export class PrescriptionService implements IPrescriptionService {
             const doctor = await this._doctorRepository.findByUserId(data.vetId);
             if (!doctor) throw new Error('Doctor profile not found for this user');
 
-            const randomDigits = Math.floor(10000 + Math.random() * 90000).toString();
-            const prescriptionId = `PRE${randomDigits}`;
+            // Check if a prescription already exists for this appointment
+            let prescription = await this._prescriptionRepository.model.findOne({ appointmentId: data.appointmentId }).session(session);
 
-            const prescription = await this._prescriptionRepository.create({
-                ...data,
-                vetId: doctor._id,
-                prescriptionId
-            });
+            if (prescription) {
+                // Update existing prescription
+                Object.assign(prescription, {
+                    ...data,
+                    vetId: doctor._id
+                    // We keep the original prescriptionId
+                });
+                await prescription.save({ session });
+                logger.info(`Updated existing prescription ${prescription.prescriptionId} for appointment ${data.appointmentId}`);
+            } else {
+                // Create new prescription
+                const randomDigits = Math.floor(10000 + Math.random() * 90000).toString();
+                const prescriptionId = `PRE${randomDigits}`;
 
-            // Update appointment with prescription ID
+                prescription = (await this._prescriptionRepository.model.create([{
+                    ...data,
+                    vetId: doctor._id,
+                    prescriptionId
+                }], { session }))[0];
+                logger.info(`Created new prescription ${prescription.prescriptionId} for appointment ${data.appointmentId}`);
+            }
+
+            // Update appointment with prescription ID to ensure it's linked
             await (this._appointmentRepository as any).model.findByIdAndUpdate(
                 data.appointmentId,
                 { prescriptionId: prescription._id }
@@ -60,10 +76,22 @@ export class PrescriptionService implements IPrescriptionService {
 
     async getPrescriptionByAppointmentId(appointmentId: string): Promise<{ success: boolean; data?: IPrescription; message?: string }> {
         try {
+            // 1. Try to find via the Appointment link first (most accurate for specific consultations)
+            const appointment = await this._appointmentRepository.findById(appointmentId);
+            if (appointment && appointment.prescriptionId) {
+                const prescription = await this._prescriptionRepository.findById(appointment.prescriptionId.toString());
+                if (prescription) {
+                    logger.info(`Fetched prescription ${prescription.prescriptionId} via appointment link for ${appointmentId}`);
+                    return { success: true, data: prescription };
+                }
+            }
+
+            // 2. Fallback to searching by ID (legacy support or if link is missing)
             const prescription = await this._prescriptionRepository.findByAppointmentId(appointmentId);
             if (!prescription) {
                 return { success: false, message: 'Prescription not found' };
             }
+            logger.info(`Fetched prescription ${prescription.prescriptionId} via appointmentId search for ${appointmentId}`);
             return { success: true, data: prescription };
         } catch (error: any) {
             return { success: false, message: error.message };

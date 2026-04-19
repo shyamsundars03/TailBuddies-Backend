@@ -22,6 +22,7 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
         }
       })
       .populate('petId', 'name species breed gender age weight picture')
+      .populate('prescriptionId')
       .sort({ createdAt: -1 }); // Recently created first
   }
 
@@ -42,6 +43,7 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
           }
         })
         .populate('petId', 'name species breed gender age weight picture')
+        .populate('prescriptionId')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),

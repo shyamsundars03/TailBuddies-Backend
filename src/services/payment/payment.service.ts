@@ -367,7 +367,7 @@ export class PaymentService implements IPaymentService {
             if (!appointment) throw new Error('Appointment not found');
             if (appointment.paymentStatus !== 'PAID') throw new Error('Appointment is not paid');
 
-            const userId = appointment.ownerId.toString();
+            const userId = (appointment.ownerId as any)._id?.toString() || appointment.ownerId.toString();
             const amount = appointment.totalAmount;
 
             // Credit back to wallet

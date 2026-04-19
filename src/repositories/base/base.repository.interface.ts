@@ -1,4 +1,5 @@
 export interface IBaseRepository<T> {
+  readonly model: any;
   create(data: Partial<T>): Promise<T>;
   findById(id: string): Promise<T | null>;
   findOne(filter: Record<string, unknown>): Promise<T | null>;

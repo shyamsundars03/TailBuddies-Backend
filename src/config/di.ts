@@ -70,6 +70,7 @@ export {
     userPetController,
     adminPetController,
     appointmentController,
+    appointmentService,
     paymentController,
     prescriptionController,
 };

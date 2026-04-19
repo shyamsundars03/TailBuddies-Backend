@@ -31,7 +31,7 @@ export interface IAppointment extends Document {
     appointmentId: string;
     delayStatus: 'none' | 'slight-delay' | 'major-delay';
     paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
-    paymentMethod: 'cash' | 'razorpay' | 'wallet';
+    paymentMethod: 'cash' | 'razorpay' | 'wallet' | 'cod';
     transactionID?: string;
     totalAmount: number;
     prescriptionId?: mongoose.Types.ObjectId;

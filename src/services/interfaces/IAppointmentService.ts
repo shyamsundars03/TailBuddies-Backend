@@ -4,7 +4,7 @@ import { ISlot } from '../../models/slot.model';
 
 export interface IAppointmentService {
     createAppointment(data: any): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
-    getAppointmentsByOwner(ownerId: string, page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }>;
+    getAppointmentsByOwner(ownerId: string, page: number, limit: number, search?: string, status?: string, timeframe?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }>;
     getAppointmentsByDoctor(doctorId: string, status?: string, page?: number, limit?: number, search?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }>;
     getAllAppointments(page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }>;
     updateAppointmentStatus(appointmentId: string, status: AppointmentStatus, userId: string): Promise<{ success: boolean; data?: IAppointment; message?: string }>;

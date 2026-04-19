@@ -8,6 +8,6 @@ export class PrescriptionRepository extends BaseRepository<IPrescription> implem
     }
 
     async findByAppointmentId(appointmentId: string): Promise<IPrescription | null> {
-        return await this._model.findOne({ appointmentId }).exec();
+        return await this._model.findOne({ appointmentId }).sort({ createdAt: -1 }).exec();
     }
 }

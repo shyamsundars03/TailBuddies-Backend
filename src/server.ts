@@ -47,11 +47,8 @@ const startServer = async () => {
       });
     };
 
-
-
     process.on('SIGTERM', gracefulShutdown);
     process.on('SIGINT', gracefulShutdown);
-
 
   } catch (error) {
     logger.error('Failed to start server:', error);

@@ -64,8 +64,8 @@ export class AppointmentController {
             const limit = parseInt(req.query.limit as string) || 10;
             const search = req.query.search as string;
             const status = req.query.status as string;
-
-            const result = await this._appointmentService.getAppointmentsByOwner(userId, page, limit, search, status);
+            const timeframe = req.query.timeframe as string;
+            const result = await this._appointmentService.getAppointmentsByOwner(userId, page, limit, search, status, timeframe);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;
@@ -383,6 +383,7 @@ export class AppointmentController {
 
 
     checkOut = async (req: AuthRequest, res: Response): Promise<void> => {
+        logger.info('AppointmentController.checkOut hit', { id: req.params.id, body: req.body });
         try {
             const id = req.params.id as string;
             const role = req.body.role as 'owner' | 'doctor';
