@@ -64,7 +64,7 @@ export class SocketService {
                     const providedSenderId = String(senderId);
 
                     if (providedSenderId !== authenticatedUserId) {
-                        logger.warn(`Sender ID mismatch: Authenticated=${authenticatedUserId}, Provided=${providedSenderId}`);
+                        logger.warn(`Sender ID mismatch for appointment ${appointmentId}: Authenticated=${authenticatedUserId}, Provided=${providedSenderId}, SocketID=${socket.id}. Payload details: roles=${JSON.stringify(socket.roles)}, senderRole=${senderRole}`);
                         throw new Error('Unauthorized: Sender ID mismatch');
                     }
 

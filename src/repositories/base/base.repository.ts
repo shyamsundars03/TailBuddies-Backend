@@ -11,6 +11,10 @@ export abstract class BaseRepository<T extends Document> implements IBaseReposit
     this._model = model;
   }
 
+  public get model(): Model<T> {
+    return this._model;
+  }
+
 
   async create(data: Partial<T>): Promise<T> {
     const entity = new this._model(data);

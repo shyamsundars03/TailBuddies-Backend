@@ -10,6 +10,8 @@ import { ISlot } from '../../models/slot.model';
 import { AppointmentStatus } from '../../enums/appointment-status.enum';
 import mongoose from 'mongoose';
 import logger from '../../logger';
+import { SocketService } from '../socket.service';
+import cron from 'node-cron';
 
 export class AppointmentService implements IAppointmentService {
 
@@ -31,6 +33,23 @@ export class AppointmentService implements IAppointmentService {
         this._petRepository = petRepository;
         this._paymentService = paymentService;
         this._prescriptionRepository = prescriptionRepository;
+
+        // Initialize Background Jobs
+        this.initializeCronJobs();
+    }
+
+    private initializeCronJobs() {
+        cron.schedule('* * * * *', async () => {
+            logger.info('Running background job: autoCancelMissedAppointments');
+            try {
+                const result = await this.autoCancelMissedAppointments();
+                if (result.cancelledCount > 0) {
+                    logger.info(`Cron job processed ${result.cancelledCount} appointments.`);
+                }
+            } catch (err) {
+                logger.error('Error in autoCancelMissedAppointments cron:', err);
+            }
+        });
     }
 
     async createAppointment(data: any): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
@@ -91,7 +110,7 @@ export class AppointmentService implements IAppointmentService {
             });
 
             // Only mark slot as booked immediately for COD
-            if (data.paymentMethod === 'cod') {
+            if (data.paymentMethod === 'cod' || data.paymentMethod === 'cash') {
                 slot.isBooked = true;
                 slot.status = 'booked';
                 await slot.save({ session });
@@ -107,10 +126,31 @@ export class AppointmentService implements IAppointmentService {
         }
     }
 
-    async getAppointmentsByOwner(ownerId: string, page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }> {
+    async getAppointmentsByOwner(ownerId: string, page: number, limit: number, search?: string, status?: string, timeframe?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }> {
         try {
             const query: any = { ownerId };
             if (status) query.status = status;
+            
+            // Timeframe filtering
+            if (timeframe && timeframe !== 'Lifetime') {
+                const now = new Date();
+                let startDate = new Date();
+                
+                if (timeframe === 'Today') {
+                    startDate.setHours(0, 0, 0, 0);
+                } else if (timeframe === 'This Week') {
+                    const day = now.getDay();
+                    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+                    startDate.setDate(diff);
+                    startDate.setHours(0, 0, 0, 0);
+                } else if (timeframe === 'This Month') {
+                    startDate.setFullYear(now.getFullYear(), now.getMonth(), 1);
+                    startDate.setHours(0, 0, 0, 0);
+                }
+                
+                query.appointmentDate = { $gte: startDate };
+            }
+
             if (search) {
                 query.$or = [
                     { 'appointmentId': { $regex: search, $options: 'i' } },
@@ -202,6 +242,11 @@ export class AppointmentService implements IAppointmentService {
                 }
             }
 
+            // Notify clients via socket
+            if (SocketService.io) {
+                SocketService.io.to(`appointment:${appointment._id}`).emit('status-updated', { status });
+            }
+
             return { success: true, data: appointment };
         } catch (error: any) {
             return { success: false, message: error.message };
@@ -221,8 +266,13 @@ export class AppointmentService implements IAppointmentService {
 
             // If it's a request (e.g. from owner), set to CANCEL_REQUEST
             // If it's from doctor or admin, set to CANCELLED
-            const isRequest = reason.toLowerCase().includes('request');
-            appointment.status = isRequest ? AppointmentStatus.CANCEL_REQUEST : AppointmentStatus.CANCELLED;
+            // Decide if it's a direct cancellation or a request
+            // For now, if called from detail pages, we treat as direct cancellation
+            // unless specific request terms are used.
+            const isRequest = reason.toLowerCase().includes('refund request');
+            const targetStatus = isRequest ? AppointmentStatus.CANCEL_REQUEST : AppointmentStatus.CANCELLED;
+            
+            appointment.status = targetStatus;
             appointment.cancellation = {
                 cancelledBy: new mongoose.Types.ObjectId(userId),
                 cancelReason: reason,
@@ -231,11 +281,13 @@ export class AppointmentService implements IAppointmentService {
             await appointment.save({ session });
 
             if (appointment.status === AppointmentStatus.CANCELLED) {
-                await Slot.findByIdAndUpdate(appointment.slotId, { isBooked: false, status: 'available' }, { session });
+                if (appointment.slotId) {
+                    await Slot.findByIdAndUpdate(appointment.slotId, { isBooked: false, status: 'available' }, { session });
+                }
 
                 // Trigger refund if paid
-                if ((appointment as any).paymentStatus === 'PAID') {
-                    await this._paymentService.refund(appointment._id.toString(), 'Appointment cancelled');
+                if (appointment.paymentStatus === 'PAID') {
+                    await this._paymentService.refund(appointment._id.toString(), reason || 'Appointment cancelled');
                 }
             }
 
@@ -509,13 +561,13 @@ export class AppointmentService implements IAppointmentService {
                         let cancelReason = '';
 
                         if (!hasOwnerCheckedIn && !hasDoctorCheckedIn) {
-                            shouldRefund = true;
+                            shouldRefund = true; 
                             cancelReason = 'Missed appointment: Both parties failed to check in within grace period.';
                         } else if (hasOwnerCheckedIn && !hasDoctorCheckedIn) {
-                            shouldRefund = true;
+                            shouldRefund = true; 
                             cancelReason = 'Missed appointment: Doctor failed to check in within grace period.';
                         } else if (!hasOwnerCheckedIn && hasDoctorCheckedIn) {
-                            shouldRefund = false;
+                            shouldRefund = false; 
                             cancelReason = 'Missed appointment: Owner failed to check in within grace period (No refund applicable).';
                         }
 
@@ -539,10 +591,66 @@ export class AppointmentService implements IAppointmentService {
                         if (appt.slotId) {
                             await Slot.findByIdAndUpdate(appt.slotId._id, { status: 'available', isBooked: false });
                         }
+                        
+                        // Notify clients via socket
+                        if (SocketService.io) {
+                            SocketService.io.to(`appointment:${appt._id}`).emit('status-updated', { 
+                                status: AppointmentStatus.CANCELLED,
+                                reason: cancelReason
+                            });
+                        }
+                        
                         cancelledCount++;
                     }
                 }
             }
+
+            // Also check for active appointments that should be auto-checked out
+            const activeAppointments = await (this._appointmentRepository as any).model.find({
+                status: 'confirmed',
+                'checkIn.vetCheckInTime': { $exists: true }
+            }).populate('slotId');
+
+            for (const appt of activeAppointments) {
+                const [endH, endM] = appt.appointmentEndTime.split(':').map(Number);
+                const apptEnd = new Date(appt.appointmentDate);
+                apptEnd.setHours(endH, endM, 0, 0);
+
+                // Auto checkout if 2 mins past end time (Reduced for easier verification)
+                if (now > new Date(apptEnd.getTime() + 2 * 60 * 1000)) {
+                    if (!appt.checkOut?.vetCheckOutTime) {
+                        appt.checkOut = { 
+                            ...appt.checkOut, 
+                            vetCheckOutTime: apptEnd, // Use EXACT scheduled end time as per user request
+                            ownerCheckOutTime: appt.checkOut?.ownerCheckOutTime || apptEnd
+                        };
+                        
+                        // Mark as completed ONLY if prescription exists. Otherwise, keep status but record checkout.
+                        if (appt.prescriptionId) {
+                            appt.status = AppointmentStatus.COMPLETED;
+                            
+                            // Diagnostic log for COD transition
+                            logger.info(`Auto-checkout diagnostic for ${appt.appointmentId}: method=${appt.paymentMethod}, paymentStatus=${appt.paymentStatus}`);
+
+                            // If it's Cash on Consultation, mark payment as PAID upon completion
+                            if ((appt.paymentMethod === 'cod' || appt.paymentMethod === 'cash') && appt.paymentStatus === 'PENDING') {
+                                appt.paymentStatus = 'PAID';
+                                logger.info(`Auto-completed COD appointment ${appt.appointmentId}: Payment marked as PAID`);
+                            }
+                        }
+
+                        await appt.save();
+
+                        if (SocketService.io) {
+                            SocketService.io.to(`appointment:${appt._id}`).emit('status-updated', { 
+                                status: appt.status,
+                                checkOut: appt.checkOut
+                            });
+                        }
+                    }
+                }
+            }
+
             return { success: true, cancelledCount };
         } catch (error: any) {
             console.error('Error in auto-cancellation:', error);
@@ -591,21 +699,24 @@ export class AppointmentService implements IAppointmentService {
                 let shouldRefund = false;
                 let cancelReason = '';
 
-                if (role === 'doctor') {
-                    // If doctor tries to check in late, we refund because either both missed or only doctor missed.
+                if (!hasOwnerCheckedIn && !hasDoctorCheckedIn) {
+                    // Both failed to check in
                     shouldRefund = true;
-                    cancelReason = !hasOwnerCheckedIn
-                        ? 'Consultation cancelled: Both parties failed to check in within grace period.'
-                        : 'Consultation cancelled: Doctor failed to check in within grace period.';
+                    cancelReason = 'Consultation cancelled: Both parties failed to check in within grace period.';
+                } else if (role === 'doctor' && hasOwnerCheckedIn) {
+                    // Doctor is late, owner already checked in
+                    shouldRefund = true;
+                    cancelReason = 'Consultation cancelled: Doctor failed to check in within grace period.';
+                } else if (role === 'owner' && hasDoctorCheckedIn) {
+                    // Owner is late, doctor already checked in
+                    shouldRefund = false;
+                    cancelReason = 'Consultation cancelled: Owner failed to check in within grace period (No refund applicable).';
                 } else {
-                    // If owner tries to check in late, they only get a refund if the doctor ALSO hasn't checked in yet.
-                    if (!hasDoctorCheckedIn) {
-                        shouldRefund = true;
-                        cancelReason = 'Consultation cancelled: Both parties failed to check in within grace period.';
-                    } else {
-                        shouldRefund = false;
-                        cancelReason = 'Consultation cancelled: Owner failed to check in within grace period (No refund applicable).';
-                    }
+                    // Default fallback
+                    shouldRefund = !hasDoctorCheckedIn;
+                    cancelReason = !hasDoctorCheckedIn
+                        ? 'Consultation cancelled: Both parties failed to check in within grace period.'
+                        : 'Consultation cancelled: Owner failed to check in within grace period (No refund applicable).';
                 }
 
                 // Auto cancel if too late
@@ -645,12 +756,19 @@ export class AppointmentService implements IAppointmentService {
                 const previousAppointments = await Appointment.find({
                     doctorId: appt.doctorId,
                     appointmentDate: { $gte: today, $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000) },
-                    status: AppointmentStatus.COMPLETED,
-                    prescriptionId: { $exists: false }
+                    // Check for BOTH completed AND past confirmed appointments that were auto-checked out
+                    $or: [
+                        { status: AppointmentStatus.COMPLETED, prescriptionId: { $exists: false } },
+                        { 
+                            status: AppointmentStatus.CONFIRMED, 
+                            'checkOut.vetCheckOutTime': { $exists: true },
+                            prescriptionId: { $exists: false }
+                        }
+                    ]
                 });
 
                 if (previousAppointments.length > 0) {
-                    throw new Error('Prescription not filled for a previous completed slot today. Blocked check-in until completed.');
+                    throw new Error('You have pending prescriptions for a previous completed or checked-out slot today. Please fill them before starting the next consultation.');
                 }
             }
 
@@ -661,6 +779,14 @@ export class AppointmentService implements IAppointmentService {
             }
 
             await appt.save();
+
+            // Notify via socket
+            if (SocketService.io) {
+                SocketService.io.to(`appointment:${appt._id}`).emit('status-updated', { 
+                    checkIn: appt.checkIn 
+                });
+            }
+
             return { success: true, data: appt };
         } catch (error: any) {
             return { success: false, message: error.message };
@@ -688,16 +814,33 @@ export class AppointmentService implements IAppointmentService {
             if (role === 'owner') {
                 appt.checkOut = { ...appt.checkOut, ownerCheckOutTime: now };
             } else {
+                // Doctor manual checkout requires prescription
+                if (!appt.prescriptionId) {
+                    throw new Error('Cannot checkout manually without filling the prescription. Please save the prescription first.');
+                }
                 appt.checkOut = { ...appt.checkOut, vetCheckOutTime: now };
-                // If vet checks out, status becomes completed? No, usually after prescription.
-                // But the user said "after this checkout the appointment should be marked as completed with prescription loaded"
-                // So if prescription is there, mark as completed.
-                if (appt.prescriptionId) {
-                    appt.status = AppointmentStatus.COMPLETED;
+                appt.status = AppointmentStatus.COMPLETED;
+
+                // Diagnostic log for COD transition
+                logger.info(`Manual-checkout diagnostic for ${appt.appointmentId}: method=${appt.paymentMethod}, paymentStatus=${appt.paymentStatus}`);
+
+                // If it's Cash on Consultation, mark payment as PAID upon manual completion
+                if ((appt.paymentMethod === 'cod' || appt.paymentMethod === 'cash') && appt.paymentStatus === 'PENDING') {
+                    appt.paymentStatus = 'PAID';
+                    logger.info(`Manually completed COD appointment ${appt.appointmentId}: Payment marked as PAID`);
                 }
             }
 
             await appt.save();
+
+            // Notify via socket
+            if (SocketService.io) {
+                SocketService.io.to(`appointment:${appt._id}`).emit('status-updated', { 
+                    status: appt.status,
+                    checkOut: appt.checkOut 
+                });
+            }
+
             return { success: true, data: appt };
         } catch (error: any) {
             return { success: false, message: error.message };
