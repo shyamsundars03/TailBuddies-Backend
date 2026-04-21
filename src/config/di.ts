@@ -27,6 +27,11 @@ import { PdfService } from '../services/pdf.service';
 import { PrescriptionRepository } from '../repositories/prescription.repository';
 import { PrescriptionService } from '../services/prescription.service';
 import { PrescriptionController } from '../controllers/prescription.controller';
+import { AiAssistantService } from '../services/ai/ai-assistant.service';
+import { AiAssistantController } from '../controllers/ai/ai-assistant.controller';
+import { ReviewRepository } from '../repositories/review.repository';
+import { ReviewService } from '../services/review.service';
+import { ReviewController } from '../controllers/review/review.controller';
 
 // Repositories
 const userRepository = new UserRepository();
@@ -37,6 +42,7 @@ const petRepository = new PetRepository();
 const appointmentRepository = new AppointmentRepository();
 const paymentRepository = new PaymentRepository();
 const prescriptionRepository = new PrescriptionRepository();
+const reviewRepository = new ReviewRepository();
 
 // Services
 const jwtService = new JwtService();
@@ -50,6 +56,8 @@ const paymentService = new PaymentService(paymentRepository);
 const pdfService = new PdfService();
 const prescriptionService = new PrescriptionService(prescriptionRepository, appointmentRepository, doctorRepository, pdfService);
 const appointmentService = new AppointmentService(appointmentRepository, doctorRepository, petRepository, paymentService, prescriptionRepository);
+const aiAssistantService = new AiAssistantService(petRepository, doctorRepository, specialtyRepository);
+const reviewService = new ReviewService(reviewRepository, appointmentRepository, doctorRepository);
 
 // Controllers
 const authController = new AuthController(authService);
@@ -61,6 +69,8 @@ const adminPetController = new AdminPetController(petService);
 const appointmentController = new AppointmentController(appointmentService);
 const paymentController = new PaymentController(paymentService);
 const prescriptionController = new PrescriptionController(prescriptionService);
+const aiAssistantController = new AiAssistantController(aiAssistantService);
+const reviewController = new ReviewController(reviewService);
 
 export {
     authController,
@@ -73,4 +83,6 @@ export {
     appointmentService,
     paymentController,
     prescriptionController,
+    aiAssistantController,
+    reviewController
 };

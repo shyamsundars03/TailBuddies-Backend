@@ -14,6 +14,8 @@ export class SpecialtyRepository extends BaseRepository<ISpecialty> implements I
 
     
     async findByName(name: string): Promise<ISpecialty | null> {
-        return await this.findOne({ name });
+        return await this.findOne({ 
+            name: { $regex: new RegExp(`^${name}$`, 'i') } 
+        });
     }
 }
