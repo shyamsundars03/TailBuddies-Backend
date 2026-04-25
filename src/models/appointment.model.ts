@@ -14,7 +14,7 @@ export interface IAppointment extends Document {
     appointmentStartTime: string;
     appointmentEndTime: string;
     mode: 'online' | 'offline';
-    status: AppointmentStatus | 'booked' | 'confirmed' | 'cancelled' | 'completed';
+    status: AppointmentStatus | 'booked' | 'confirmed' | 'cancelled' | 'completed' | 'ongoing';
     cancellation?: {
         cancelledBy: mongoose.Types.ObjectId;
         cancelReason: string;

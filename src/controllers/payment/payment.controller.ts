@@ -153,4 +153,54 @@ export class PaymentController {
             res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
         }
     };
+
+    requestWithdrawal = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const userId = req.user?.userId;
+            if (!userId) {
+                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+                return;
+            }
+            const { amount } = req.body;
+            const result = await this._paymentService.requestWithdrawal(userId, amount);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error in requestWithdrawal controller', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
+
+    approveWithdrawal = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const id = String(req.params.id);
+            const result = await this._paymentService.approveWithdrawal(id);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error in approveWithdrawal controller', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
+
+    rejectWithdrawal = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const id = String(req.params.id);
+            const result = await this._paymentService.rejectWithdrawal(id);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error in rejectWithdrawal controller', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
 }

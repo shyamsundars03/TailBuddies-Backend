@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction, RequestHandler } from 'express';
-import { adminController, adminPetController } from '../config/di';
+import { adminController, adminPetController, adminAnalyticsController } from '../config/di';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '../enums/user-role.enum';
 import { AppError } from '../errors/app-error';
@@ -21,6 +21,11 @@ router.post('/signin', adminController.adminLogin);
 router.use(authMiddleware as unknown as RequestHandler);
 router.use(adminOnly as unknown as RequestHandler);
 
+// Analytics & Reports
+router.get('/dashboard-stats', adminAnalyticsController.getDashboardStats);
+router.get('/reports', adminAnalyticsController.getReports);
+router.get('/specialty-stats', adminAnalyticsController.getSpecialtyStats);
+
 // Specialty Management
 router.post('/specialties', adminController.createSpecialty);
 router.get('/specialties', adminController.getSpecialties);
@@ -40,5 +45,6 @@ router.patch('/doctors/:id/reject', (req, res) => adminController.verifyDoctor(r
 // Pet Management (Admin)
 router.get('/pets', adminPetController.getAllPets);
 router.get('/pets/:id', adminPetController.getPetById);
+
 
 export default router;

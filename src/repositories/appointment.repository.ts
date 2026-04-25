@@ -11,6 +11,21 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
     super(Appointment);
   }
 
+  async findById(id: string): Promise<IAppointment | null> {
+    return await this._model.findById(id)
+      .populate('ownerId', 'username email phone')
+      .populate({
+        path: 'doctorId',
+        populate: {
+          path: 'userId',
+          select: 'username email profilePic'
+        }
+      })
+      .populate('petId', 'name species breed gender age weight picture')
+      .populate('prescriptionId')
+      .populate('cancellation.cancelledBy', 'username email');
+  }
+
   async findWithDetails(query: any): Promise<IAppointment[]> {
     return await this._model.find(query)
       .populate('ownerId', 'username email phone')
@@ -23,12 +38,9 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
       })
       .populate('petId', 'name species breed gender age weight picture')
       .populate('prescriptionId')
+      .populate('cancellation.cancelledBy', 'username email')
       .sort({ createdAt: -1 }); // Recently created first
   }
-
-
-
-
 
   async findWithPagination(query: any, page: number, limit: number): Promise<{ appointments: IAppointment[], total: number }> {
     const skip = (page - 1) * limit;
@@ -44,6 +56,7 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
         })
         .populate('petId', 'name species breed gender age weight picture')
         .populate('prescriptionId')
+        .populate('cancellation.cancelledBy', 'username email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),

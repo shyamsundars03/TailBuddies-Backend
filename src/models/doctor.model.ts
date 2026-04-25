@@ -69,6 +69,8 @@ export interface IDoctor extends Document {
     isActive: boolean;
     appointmentDuration: number;
     totalAppointments: number;
+    averageRating: number;
+    reviewCount: number;
     recurringSchedules?: {
         id: string;
         rrule: string;
@@ -181,6 +183,14 @@ const doctorSchema = new Schema<IDoctor>(
             default: 30, // Default to 30 minutes
         },
         totalAppointments: {
+            type: Number,
+            default: 0,
+        },
+        averageRating: {
+            type: Number,
+            default: 0,
+        },
+        reviewCount: {
             type: Number,
             default: 0,
         },

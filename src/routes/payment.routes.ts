@@ -13,5 +13,8 @@ router.get('/transactions', authMiddleware, paymentController.getTransactions);
 router.get('/admin/transactions', authMiddleware, adminOnly, paymentController.getAllTransactions);
 router.get('/admin/transactions/:id', authMiddleware, adminOnly, paymentController.getTransactionDetail);
 router.post('/retry', authMiddleware, paymentController.retryPayment);
+router.post('/wallet/withdraw/request', authMiddleware, paymentController.requestWithdrawal);
+router.patch('/admin/transactions/:id/approve', authMiddleware, adminOnly, paymentController.approveWithdrawal);
+router.patch('/admin/transactions/:id/reject', authMiddleware, adminOnly, paymentController.rejectWithdrawal);
 
 export default router;

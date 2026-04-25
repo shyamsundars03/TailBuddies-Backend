@@ -98,7 +98,8 @@ export class PetRepository implements IPetRepository {
         return result !== null;
     }
 
-
-
-    
+    async findIdsByName(name: string): Promise<string[]> {
+        const pets = await Pet.find({ name: { $regex: name, $options: 'i' } }).select('_id');
+        return pets.map(p => p._id.toString());
+    }
 }

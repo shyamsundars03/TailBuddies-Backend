@@ -8,4 +8,5 @@ export interface IReviewRepository extends IBaseRepository<IReview> {
     findByDoctorId(doctorId: string): Promise<IReview[]>;
     findByOwnerId(ownerId: string): Promise<IReview[]>;
     findByIdWithPopulate(id: string): Promise<IReview | null>;
+    findWithPagination(filter: FilterQuery<IReview>, page: number, limit: number): Promise<{ reviews: IReview[], total: number }>;
 }

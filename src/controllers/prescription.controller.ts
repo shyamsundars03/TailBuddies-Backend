@@ -11,7 +11,7 @@ export class PrescriptionController {
     createPrescription = async (req: Request, res: Response) => {
         const result = await this._prescriptionService.createPrescription({
             ...req.body,
-            vetId: (req as any).user.userId // Handle doctor ID from auth
+            vetId: (req as any).user.userId 
         });
         if (result.success) {
             return res.status(201).json(result);

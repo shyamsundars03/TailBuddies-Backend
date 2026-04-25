@@ -4,6 +4,7 @@ import { IAppointmentRepository } from '../repositories/interfaces/IAppointmentR
 import { IDoctorRepository } from '../repositories/interfaces/IDoctorRepository';
 import { IPrescription } from '../models/prescription.model';
 import { IPdfService } from './interfaces/IPdfService';
+import { INotificationService } from './notification.service';
 import mongoose from 'mongoose';
 import logger from '../logger';
 
@@ -12,81 +13,123 @@ export class PrescriptionService implements IPrescriptionService {
     private readonly _appointmentRepository: IAppointmentRepository;
     private readonly _doctorRepository: IDoctorRepository;
     private readonly _pdfService: IPdfService;
+    private readonly _notificationService: INotificationService;
 
     constructor(
         prescriptionRepository: IPrescriptionRepository,
         appointmentRepository: IAppointmentRepository,
         doctorRepository: IDoctorRepository,
-        pdfService: IPdfService
+        pdfService: IPdfService,
+        notificationService: INotificationService
     ) {
         this._prescriptionRepository = prescriptionRepository;
         this._appointmentRepository = appointmentRepository;
         this._doctorRepository = doctorRepository;
         this._pdfService = pdfService;
+        this._notificationService = notificationService;
     }
 
     async createPrescription(data: any): Promise<{ success: boolean; data?: IPrescription; message?: string }> {
-        const session = await mongoose.startSession();
-        session.startTransaction();
         try {
-            // Map userId to doctorId
+            
             const doctor = await this._doctorRepository.findByUserId(data.vetId);
             if (!doctor) throw new Error('Doctor profile not found for this user');
 
-            // Check if a prescription already exists for this appointment
-            let prescription = await this._prescriptionRepository.model.findOne({ appointmentId: data.appointmentId }).session(session);
+           
+            let prescription = await this._prescriptionRepository.model.findOne({ appointmentId: data.appointmentId });
 
             if (prescription) {
-                // Update existing prescription
+               
                 Object.assign(prescription, {
                     ...data,
                     vetId: doctor._id
-                    // We keep the original prescriptionId
                 });
-                await prescription.save({ session });
+                
+
+                prescription.markModified('vitals');
+                prescription.markModified('medications');
+                
+                await prescription.save();
                 logger.info(`Updated existing prescription ${prescription.prescriptionId} for appointment ${data.appointmentId}`);
             } else {
-                // Create new prescription
+                
                 const randomDigits = Math.floor(10000 + Math.random() * 90000).toString();
                 const prescriptionId = `PRE${randomDigits}`;
 
-                prescription = (await this._prescriptionRepository.model.create([{
+                prescription = await this._prescriptionRepository.create({
                     ...data,
                     vetId: doctor._id,
                     prescriptionId
-                }], { session }))[0];
+                });
                 logger.info(`Created new prescription ${prescription.prescriptionId} for appointment ${data.appointmentId}`);
             }
 
-            // Update appointment with prescription ID to ensure it's linked
+            
             await (this._appointmentRepository as any).model.findByIdAndUpdate(
                 data.appointmentId,
-                { prescriptionId: prescription._id }
-            ).session(session);
+                { prescriptionId: prescription._id.toString() }
+            );
 
-            await session.commitTransaction();
+           
+            try {
+                const appointment = await this._appointmentRepository.findById(data.appointmentId);
+                if (appointment) {
+                    await this._notificationService.createNotification(
+                        appointment.ownerId.toString(),
+                        'New Prescription Available',
+                        `A new prescription has been issued for your recent consultation. You can view or download it now.`,
+                        'prescription',
+                        `/owner/appointments/${data.appointmentId}`
+                    );
+                }
+            } catch (notiError) {
+                logger.error('Error creating notification for prescription', { notiError });
+            }
+
+            
+            const { SocketService } = require('./socket.service');
+            if (SocketService.io) {
+                SocketService.io.to(`appointment:${data.appointmentId}`).emit('status-updated', { 
+                    prescriptionId: prescription._id 
+                });
+            }
+
             return { success: true, data: prescription };
         } catch (error: any) {
-            await session.abortTransaction();
+            logger.error(`Error in createPrescription: ${error.message}`);
             return { success: false, message: error.message };
-        } finally {
-            session.endSession();
         }
     }
 
     async getPrescriptionByAppointmentId(appointmentId: string): Promise<{ success: boolean; data?: IPrescription; message?: string }> {
         try {
-            // 1. Try to find via the Appointment link first (most accurate for specific consultations)
+            
             const appointment = await this._appointmentRepository.findById(appointmentId);
             if (appointment && appointment.prescriptionId) {
-                const prescription = await this._prescriptionRepository.findById(appointment.prescriptionId.toString());
+                
+                if (typeof appointment.prescriptionId === 'object' && (appointment.prescriptionId as any).prescriptionId) {
+                    return { success: true, data: appointment.prescriptionId as any };
+                }
+
+                
+                let idToUse = appointment.prescriptionId.toString();
+                if (idToUse.includes('{') || idToUse.includes('ObjectId')) {
+                    const idMatch = idToUse.match(/_id:\s*(?:new\s+ObjectId\()?['"]?([a-f\d]{24})['"]?/i);
+                    if (idMatch) {
+                        idToUse = idMatch[1];
+                        logger.info(`Extracted ID ${idToUse} from corrupted prescriptionId string`);
+                    }
+                }
+                
+                
+                const prescription = await this._prescriptionRepository.findById(idToUse);
                 if (prescription) {
                     logger.info(`Fetched prescription ${prescription.prescriptionId} via appointment link for ${appointmentId}`);
                     return { success: true, data: prescription };
                 }
             }
 
-            // 2. Fallback to searching by ID (legacy support or if link is missing)
+            
             const prescription = await this._prescriptionRepository.findByAppointmentId(appointmentId);
             if (!prescription) {
                 return { success: false, message: 'Prescription not found' };

@@ -163,7 +163,8 @@ export class DoctorController {
             const filters = {
                 specialty: req.query.specialty,
                 gender: req.query.gender,
-                experienceYears: req.query.experienceYears
+                experienceYears: req.query.experienceYears,
+                city: req.query.city
             };
 
             logger.info(`[DoctorController] Fetching doctors: page=${page}, limit=${limit}, search=${search}, isVerified=${isVerified}`);

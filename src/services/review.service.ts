@@ -25,28 +25,29 @@ export class ReviewService {
             throw new AppError('Appointment ID and rating are required', HttpStatus.BAD_REQUEST);
         }
 
-        // Check if appointment exists and belongs to owner
+       
         const appointment = await this.appointmentRepository.findById(appointmentId.toString());
         if (!appointment) {
             throw new AppError('Appointment not found', HttpStatus.NOT_FOUND);
         }
 
-        if (appointment.ownerId.toString() !== ownerId) {
+        const ownerIdToCompare = (appointment.ownerId as any)._id ? (appointment.ownerId as any)._id.toString() : appointment.ownerId.toString();
+        if (ownerIdToCompare !== ownerId) {
             throw new AppError('You are not authorized to review this appointment', HttpStatus.UNAUTHORIZED);
         }
 
-        // Check status
+        
         if (appointment.status !== 'completed') {
             throw new AppError('You can only review completed appointments', HttpStatus.BAD_REQUEST);
         }
 
-        // Check for duplicate
+        
         const existingReview = await this.reviewRepository.findByAppointmentId(appointmentId.toString());
         if (existingReview) {
             throw new AppError('You have already reviewed this appointment', HttpStatus.BAD_REQUEST);
         }
 
-        // Word count validation
+        
         if (comment && this.countWords(comment) > 100) {
             throw new AppError('Comment cannot exceed 100 words', HttpStatus.BAD_REQUEST);
         }
@@ -58,6 +59,8 @@ export class ReviewService {
             rating,
             comment
         } as any);
+
+        await this.updateDoctorRating(appointment.doctorId.toString());
 
         return await this.reviewRepository.findByIdWithPopulate(review._id.toString()) as IReview;
     }
@@ -77,6 +80,11 @@ export class ReviewService {
         }
 
         await this.reviewRepository.update(reviewId, data);
+        
+        if (data.rating) {
+            await this.updateDoctorRating(review.doctorId.toString());
+        }
+
         return await this.reviewRepository.findByIdWithPopulate(reviewId);
     }
 
@@ -91,7 +99,12 @@ export class ReviewService {
             throw new AppError('You are not authorized to delete this review', HttpStatus.UNAUTHORIZED);
         }
 
-        return await this.reviewRepository.delete(reviewId);
+        const doctorId = review.doctorId.toString();
+        const deleted = await this.reviewRepository.delete(reviewId);
+        if (deleted) {
+            await this.updateDoctorRating(doctorId);
+        }
+        return deleted;
     }
 
     async replyToReview(userId: string, reviewId: string, comment: string): Promise<IReview | null> {
@@ -191,20 +204,71 @@ export class ReviewService {
         } as any);
     }
 
-    async getReviewsByDoctor(userId: string): Promise<IReview[]> {
+    async getReviewsByDoctor(doctorId: string, page: number = 1, limit: number = 4, search?: string): Promise<{ reviews: IReview[], total: number }> {
+        const query: any = { doctorId };
+        if (search) {
+            const owners = await (this.reviewRepository as any)._model.db.model('User').find({
+                username: { $regex: search, $options: 'i' }
+            }).select('_id');
+            query.ownerId = { $in: owners.map((o: any) => o._id) };
+        }
+        return await this.reviewRepository.findWithPagination(query, page, limit);
+    }
+
+    async getReviewsByDoctorUserId(userId: string, page: number = 1, limit: number = 4, search?: string): Promise<{ reviews: IReview[], total: number }> {
         const doctor = await this.doctorRepository.findByUserId(userId);
         if (!doctor) {
             throw new AppError('Doctor profile not found', HttpStatus.NOT_FOUND);
         }
-        return await this.reviewRepository.findByDoctorId(doctor._id.toString());
+        return await this.getReviewsByDoctor(doctor._id.toString(), page, limit, search);
     }
 
-    async getReviewsByOwner(ownerId: string): Promise<IReview[]> {
-        return await this.reviewRepository.findByOwnerId(ownerId);
+    async getReviewsByOwner(ownerId: string, page: number = 1, limit: number = 4, search?: string): Promise<{ reviews: IReview[], total: number }> {
+        const query: any = { ownerId };
+        if (search) {
+            const doctorUserIds = await (this.reviewRepository as any)._model.db.model('User').find({
+                username: { $regex: search, $options: 'i' }
+            }).select('_id');
+            
+            const doctors = await (this.doctorRepository as any)._model.find({
+                userId: { $in: doctorUserIds.map((u: any) => u._id) }
+            }).select('_id');
+            
+            query.doctorId = { $in: doctors.map((d: any) => d._id) };
+        }
+        return await this.reviewRepository.findWithPagination(query, page, limit);
     }
 
-    async getAllReviews(): Promise<IReview[]> {
-        return await this.reviewRepository.findAllWithPopulate({});
+    async getAllReviews(page: number = 1, limit: number = 4, search?: string): Promise<{ reviews: IReview[], total: number }> {
+        const query: any = {};
+        if (search) {
+            const users = await (this.reviewRepository as any)._model.db.model('User').find({
+                username: { $regex: search, $options: 'i' }
+            }).select('_id');
+            
+            const doctors = await (this.doctorRepository as any)._model.find({
+                userId: { $in: users.map((u: any) => u._id) }
+            }).select('_id');
+
+            query.$or = [
+                { ownerId: { $in: users.map((u: any) => u._id) } },
+                { doctorId: { $in: doctors.map((d: any) => d._id) } }
+            ];
+        }
+        return await this.reviewRepository.findWithPagination(query, page, limit);
+    }
+
+    async recalculateAllDoctorRatings(): Promise<{ success: boolean; message: string }> {
+        try {
+            const doctors = await (this.doctorRepository as any)._model.find({});
+            for (const doctor of doctors) {
+                await this.updateDoctorRating(doctor._id.toString());
+            }
+            return { success: true, message: `Recalculated ratings for ${doctors.length} doctors` };
+        } catch (error: any) {
+            logger.error('Error recalculating all ratings', { error: error.message });
+            return { success: false, message: error.message };
+        }
     }
 
     async getReviewById(reviewId: string): Promise<IReview | null> {
@@ -223,5 +287,18 @@ export class ReviewService {
 
     async getReviewByAppointment(appointmentId: string): Promise<IReview | null> {
         return await this.reviewRepository.findByAppointmentId(appointmentId);
+    }
+
+    private async updateDoctorRating(doctorId: string): Promise<void> {
+        const reviews = await this.reviewRepository.findByDoctorId(doctorId);
+        const count = reviews.length;
+        const average = count > 0 
+            ? reviews.reduce((acc, curr) => acc + curr.rating, 0) / count 
+            : 0;
+
+        await this.doctorRepository.update(doctorId, {
+            averageRating: parseFloat(average.toFixed(1)),
+            reviewCount: count
+        } as any);
     }
 }

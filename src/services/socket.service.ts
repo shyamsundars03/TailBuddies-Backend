@@ -82,13 +82,12 @@ export class SocketService {
                     const apptEnd = new Date(appointment.appointmentDate);
                     apptEnd.setHours(endH, endM, 0, 0);
 
-                    // Allow chat strictly from start time to end time
                     if (now < apptStart || now > apptEnd) {
                         socket.emit('error', { message: 'Chat is only active during the consultation time window.' });
                         return;
                     }
 
-                    // Save message to database for persistence
+                    
                     try {
                         await ChatMessage.create({
                             appointmentId: appointment._id,
@@ -100,7 +99,7 @@ export class SocketService {
                         logger.info(`Message persisted for appointment ${appointmentId}`);
                     } catch (dbError) {
                         logger.error('Failed to persist chat message:', dbError);
-                        // We still broadcast the message even if persistence fails to avoid blocking the user
+                        
                     }
 
                     this._io.to(`appointment:${appointmentId}`).emit('receive-message', {

@@ -143,14 +143,21 @@ export class ReviewController {
     getDoctorReviews = async (req: AuthRequest, res: Response): Promise<void> => {
         try {
             const userId = req.user?.userId;
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 4;
+            const search = req.query.search as string;
+
             if (!userId) {
                 res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
                 return;
             }
-            const reviews = await this.reviewService.getReviewsByDoctor(userId);
+            const data = await this.reviewService.getReviewsByDoctorUserId(userId, page, limit, search);
             res.status(HttpStatus.OK).json({
                 success: true,
-                data: reviews
+                data: data.reviews,
+                total: data.total,
+                page,
+                limit
             });
         } catch (error: any) {
             logger.error('Error fetching doctor reviews', { error: error.message });
@@ -164,14 +171,21 @@ export class ReviewController {
     getOwnerReviews = async (req: AuthRequest, res: Response): Promise<void> => {
         try {
             const userId = req.user?.userId;
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 4;
+            const search = req.query.search as string;
+
             if (!userId) {
                 res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
                 return;
             }
-            const reviews = await this.reviewService.getReviewsByOwner(userId);
+            const data = await this.reviewService.getReviewsByOwner(userId, page, limit, search);
             res.status(HttpStatus.OK).json({
                 success: true,
-                data: reviews
+                data: data.reviews,
+                total: data.total,
+                page,
+                limit
             });
         } catch (error: any) {
             logger.error('Error fetching owner reviews', { error: error.message });
@@ -184,10 +198,17 @@ export class ReviewController {
 
     getAllReviews = async (req: AuthRequest, res: Response): Promise<void> => {
         try {
-            const reviews = await this.reviewService.getAllReviews();
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 4;
+            const search = req.query.search as string;
+
+            const data = await this.reviewService.getAllReviews(page, limit, search);
             res.status(HttpStatus.OK).json({
                 success: true,
-                data: reviews
+                data: data.reviews,
+                total: data.total,
+                page,
+                limit
             });
         } catch (error: any) {
             logger.error('Error fetching all reviews', { error: error.message });
@@ -227,10 +248,44 @@ export class ReviewController {
             });
         } catch (error: any) {
             logger.error('Error fetching review by appointment', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
                 success: false,
                 message: error.message
             });
+        }
+    };
+
+    getByDoctorId = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const doctorId = req.params.doctorId as string;
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 10;
+            const search = req.query.search as string;
+
+            const data = await this.reviewService.getReviewsByDoctor(doctorId, page, limit, search);
+            res.status(HttpStatus.OK).json({
+                success: true,
+                data: data.reviews,
+                total: data.total,
+                page,
+                limit
+            });
+        } catch (error: any) {
+            logger.error('Error fetching reviews by doctor ID', { error: error.message });
+            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
+                success: false,
+                message: error.message
+            });
+        }
+    };
+
+    recalculateRatings = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const result = await this.reviewService.recalculateAllDoctorRatings();
+            res.status(HttpStatus.OK).json(result);
+        } catch (error: any) {
+            logger.error('Error in recalculateRatings controller', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
         }
     };
 }

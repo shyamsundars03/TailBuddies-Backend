@@ -36,9 +36,15 @@ export interface IPaymentService {
     retryPayment(appointmentId: string, method: string): Promise<{ success: boolean; order?: any; message?: string }>;
     
     // Refund logic
-    refund(appointmentId: string, reason: string): Promise<{ success: boolean; message: string }>;
+    refund(appointmentId: string, reason: string, session?: ClientSession): Promise<{ success: boolean; message: string }>;
 
     // Admin operations
     getAllTransactions(page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; transactions?: IWalletTransaction[]; total?: number; message?: string }>;
     getTransactionDetail(id: string): Promise<{ success: boolean; transaction?: IWalletTransaction; message?: string }>;
+
+    // Doctor specific
+    creditDoctorWallet(userId: string, amount: number, appointmentId: string, humanReadableId: string): Promise<{ success: boolean; message: string }>;
+    requestWithdrawal(userId: string, amount: number): Promise<{ success: boolean; message: string }>;
+    approveWithdrawal(transactionId: string): Promise<{ success: boolean; message: string }>;
+    rejectWithdrawal(transactionId: string): Promise<{ success: boolean; message: string }>;
 }

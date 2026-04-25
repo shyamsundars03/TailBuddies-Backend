@@ -24,6 +24,8 @@ interface EnvConfig {
   jwtRefreshMaxAge: number;
   razorpayKeyId: string;
   razorpayKeySecret: string;
+  agoraAppId: string;
+  agoraAppCertificate: string;
 }
 
 class EnvValidator {
@@ -54,6 +56,8 @@ class EnvValidator {
       jwtRefreshMaxAge: this.parseDurationToMs(process.env.JWT_REFRESH_EXPIRY || '7d'),
       razorpayKeyId: process.env.RAZORPAY_KEY_ID,
       razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
+      agoraAppId: process.env.AGORA_APP_ID,
+      agoraAppCertificate: process.env.AGORA_APP_CERTIFICATE,
     };
   }
 

@@ -350,6 +350,14 @@ export class DoctorService implements IDoctorService {
             if (filters.experienceYears) {
                 filter['profile.experienceYears'] = { $gte: Number(filters.experienceYears) };
             }
+
+            if (filters.city) {
+                filter['clinicInfo.address.city'] = { $regex: filters.city, $options: 'i' };
+            }
+
+            if (filters.minRating) {
+                filter.averageRating = { $gte: Number(filters.minRating) };
+            }
         }
 
 
@@ -400,7 +408,7 @@ export class DoctorService implements IDoctorService {
         const options = {
             skip: (page - 1) * limit,
             limit: limit,
-            sort: { createdAt: -1 }
+            sort: { averageRating: -1, createdAt: -1 } as any
         };
 
         const doctors = await (this._doctorRepository as any)._model.find(filter, null, options)

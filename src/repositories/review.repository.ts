@@ -84,4 +84,29 @@ export class ReviewRepository extends BaseRepository<IReview> implements IReview
                 }
             });
     }
+
+    async findWithPagination(filter: FilterQuery<IReview>, page: number, limit: number): Promise<{ reviews: IReview[], total: number }> {
+        const skip = (page - 1) * limit;
+        const [reviews, total] = await Promise.all([
+            this._model.find(filter)
+                .populate('appointmentId')
+                .populate({
+                    path: 'ownerId',
+                    select: 'username email profilePic'
+                })
+                .populate({
+                    path: 'doctorId',
+                    populate: {
+                        path: 'userId',
+                        select: 'username email profilePic'
+                    }
+                })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            this._model.countDocuments(filter)
+        ]);
+
+        return { reviews, total };
+    }
 }

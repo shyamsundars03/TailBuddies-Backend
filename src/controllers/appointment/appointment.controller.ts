@@ -31,6 +31,7 @@ export class AppointmentController {
             }
             const result = await this._appointmentService.createAppointment({
                 ...req.body,
+                mode: req.body?.mode === 'online' ? 'online' : 'offline',
                 ownerId: userId
             });
             if (result.success) {
@@ -408,8 +409,10 @@ export class AppointmentController {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
             const search = req.query.search as string;
+            const species = req.query.species as string;
+            const date = req.query.date as string;
 
-            const result = await this._appointmentService.getPatientsByDoctor(userId, page, limit, search);
+            const result = await this._appointmentService.getPatientsByDoctor(userId, page, limit, search, species, date);
             if (result.success) {
                 res.status(HttpStatus.OK).json(result);
                 return;

@@ -359,9 +359,9 @@ export class PaymentService implements IPaymentService {
         }
     }
 
-    async refund(appointmentId: string, reason: string): Promise<{ success: boolean; message: string }> {
-        const session = await mongoose.startSession();
-        session.startTransaction();
+    async refund(appointmentId: string, reason: string, externalSession?: mongoose.ClientSession): Promise<{ success: boolean; message: string }> {
+        const session = externalSession || await mongoose.startSession();
+        if (!externalSession) session.startTransaction();
         try {
             const appointment = await Appointment.findById(appointmentId).session(session);
             if (!appointment) throw new Error('Appointment not found');
@@ -381,7 +381,7 @@ export class PaymentService implements IPaymentService {
                 transactionID: `REF_${Date.now()}`,
                 walletID: wallet._id,
                 type: 'credit',
-                source: 'refund' as any,
+                source: 'appointment-refund' as any,
                 amount: amount,
                 appointmentID: appointment._id as mongoose.Types.ObjectId,
                 humanReadableId: appointment.appointmentId,
@@ -389,17 +389,15 @@ export class PaymentService implements IPaymentService {
             }, session);
 
             // Update appointment payment status
-            appointment.paymentStatus = 'REFUNDED';
-            await appointment.save({ session });
-
-            await session.commitTransaction();
+            await Appointment.findByIdAndUpdate(appointmentId, { paymentStatus: 'REFUNDED' }, { session });
+            if (!externalSession) await session.commitTransaction();
             return { success: true, message: 'Refund processed to wallet successfully' };
         } catch (error: any) {
-            await session.abortTransaction();
+            if (!externalSession) await session.abortTransaction();
             logger.error('Error in refund method', { error: error.message });
             return { success: false, message: error.message };
         } finally {
-            session.endSession();
+            if (!externalSession) session.endSession();
         }
     }
 
@@ -423,6 +421,165 @@ export class PaymentService implements IPaymentService {
         } catch (error: any) {
             logger.error('Error fetching transaction detail', { error: error.message });
             return { success: false, message: 'Failed to fetch transaction detail' };
+        }
+    }
+
+    async creditDoctorWallet(userId: string, amount: number, appointmentId: string, humanReadableId: string): Promise<{ success: boolean; message: string }> {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            let wallet = await this._paymentRepository.getWalletByUserId(userId, session);
+            if (!wallet) {
+                wallet = await this._paymentRepository.createWallet({ 
+                    userId: new mongoose.Types.ObjectId(userId), 
+                    balance: 0, 
+                    holdAmount: 0 
+                }, session);
+            }
+
+            await this._paymentRepository.updateWalletBalance(userId, amount, 'credit', session);
+
+            const txnId = `DOC_CREDIT_${Date.now()}_${appointmentId.slice(-4)}`;
+            await (this._paymentRepository as any).createWalletTransaction({
+                transactionID: txnId,
+                walletID: wallet._id,
+                type: 'credit',
+                source: 'appointment-payment' as any,
+                amount: amount,
+                appointmentID: new mongoose.Types.ObjectId(appointmentId),
+                humanReadableId: humanReadableId,
+                message: `Consultation fee for ${humanReadableId}`
+            }, session);
+
+            await session.commitTransaction();
+            return { success: true, message: 'Doctor wallet credited' };
+        } catch (error: any) {
+            await session.abortTransaction();
+            logger.error('Error crediting doctor wallet', { error: error.message });
+            return { success: false, message: error.message };
+        } finally {
+            session.endSession();
+        }
+    }
+
+    async requestWithdrawal(userId: string, amount: number): Promise<{ success: boolean; message: string }> {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            const wallet = await this._paymentRepository.getWalletByUserId(userId, session);
+            if (!wallet || wallet.balance < amount) {
+                return { success: false, message: 'Insufficient wallet balance' };
+            }
+
+            const commission = amount * 0.1;
+            const netAmount = amount - commission;
+
+            // Scenario: All withdrawals now require Admin approval
+            wallet.isRequested = true;
+            await wallet.save({ session });
+
+            const txnId = `REQ_${Date.now()}`;
+            await (this._paymentRepository as any).createWalletTransaction({
+                transactionID: txnId,
+                walletID: wallet._id,
+                type: 'requested',
+                status: 'PENDING',
+                source: 'withdrawal' as any,
+                amount: amount,
+                grossAmount: amount,
+                commission: commission,
+                netAmount: netAmount,
+                message: `Withdrawal requested (Pending Admin Approval). Net Payout: ₹${netAmount} after 10% company share.`
+            }, session);
+
+            await session.commitTransaction();
+            return { success: true, message: 'Withdrawal request submitted for Admin approval' };
+        } catch (error: any) {
+            await session.abortTransaction();
+            logger.error('Error in requestWithdrawal', { error: error.message });
+            return { success: false, message: error.message };
+        } finally {
+            session.endSession();
+        }
+    }
+
+    async approveWithdrawal(transactionId: string): Promise<{ success: boolean; message: string }> {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            const transaction = await this._paymentRepository.getTransactionById(transactionId);
+            
+            if (!transaction) {
+                return { success: false, message: 'Transaction not found' };
+            }
+
+            if (transaction.status !== 'PENDING' || transaction.type !== 'requested') {
+                return { success: false, message: 'Transaction is not in a pending requested state' };
+            }
+
+            const wallet = transaction.walletID as any;
+            if (!wallet) {
+                return { success: false, message: 'Associated wallet not found' };
+            }
+
+            // 1. Deduct amount from wallet balance (since it was only requested before)
+            if (wallet.balance < transaction.amount) {
+                return { success: false, message: 'Insufficient wallet balance for this withdrawal' };
+            }
+
+            wallet.balance -= transaction.amount;
+            wallet.isRequested = false;
+            await wallet.save({ session });
+
+            // 2. Update transaction status and type
+            transaction.status = 'COMPLETED';
+            transaction.type = 'debit';
+            transaction.message = 'Withdrawal approved by Admin';
+            await transaction.save({ session });
+
+            await session.commitTransaction();
+            return { success: true, message: 'Withdrawal approved successfully' };
+        } catch (error: any) {
+            await session.abortTransaction();
+            logger.error('Error in approveWithdrawal', { error: error.message });
+            return { success: false, message: error.message };
+        } finally {
+            session.endSession();
+        }
+    }
+
+    async rejectWithdrawal(transactionId: string): Promise<{ success: boolean; message: string }> {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            const transaction = await this._paymentRepository.getTransactionById(transactionId);
+            
+            if (!transaction) {
+                return { success: false, message: 'Transaction not found' };
+            }
+
+            if (transaction.status !== 'PENDING') {
+                return { success: false, message: 'Transaction is not pending' };
+            }
+
+            const wallet = transaction.walletID as any;
+            if (wallet) {
+                wallet.isRequested = false;
+                await wallet.save({ session });
+            }
+
+            transaction.status = 'REJECTED';
+            transaction.message = 'Withdrawal request rejected by Admin';
+            await transaction.save({ session });
+
+            await session.commitTransaction();
+            return { success: true, message: 'Withdrawal request rejected' };
+        } catch (error: any) {
+            await session.abortTransaction();
+            logger.error('Error in rejectWithdrawal', { error: error.message });
+            return { success: false, message: error.message };
+        } finally {
+            session.endSession();
         }
     }
 }

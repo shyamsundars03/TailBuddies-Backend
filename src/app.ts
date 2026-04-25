@@ -15,6 +15,8 @@ import appointmentRoutes from './routes/appointment.routes';
 import paymentRoutes from './routes/payment.routes';
 import prescriptionRoutes from './routes/prescription.routes';
 import chatRoutes from './routes/chat.routes';
+import agoraRoutes from './routes/agora.routes';
+import notificationRoutes from './routes/notification.routes';
 
 
 const app = express();
@@ -23,7 +25,7 @@ const app = express();
 // Middleware
 app.use(cookieParser());
 app.use(cors({
-  origin: env.frontendUrl || 'http://localhost:3000',
+  origin: env.frontendUrl || 'http://localhost:3000' ,
   credentials: true,
 }));
 
@@ -47,6 +49,8 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/agora', agoraRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api', routes);
 
 

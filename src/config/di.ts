@@ -32,6 +32,11 @@ import { AiAssistantController } from '../controllers/ai/ai-assistant.controller
 import { ReviewRepository } from '../repositories/review.repository';
 import { ReviewService } from '../services/review.service';
 import { ReviewController } from '../controllers/review/review.controller';
+import { NotificationRepository } from '../repositories/notification.repository';
+import { NotificationService } from '../services/notification.service';
+import { NotificationController } from '../controllers/notification.controller';
+import { AdminAnalyticsService } from '../services/admin-analytics.service';
+import { AdminAnalyticsController } from '../controllers/admin/admin-analytics.controller';
 
 // Repositories
 const userRepository = new UserRepository();
@@ -43,6 +48,7 @@ const appointmentRepository = new AppointmentRepository();
 const paymentRepository = new PaymentRepository();
 const prescriptionRepository = new PrescriptionRepository();
 const reviewRepository = new ReviewRepository();
+const notificationRepository = new NotificationRepository();
 
 // Services
 const jwtService = new JwtService();
@@ -53,9 +59,11 @@ const userService = new UserService(userRepository, otpRepository, emailService)
 const doctorService = new DoctorService(doctorRepository, specialtyRepository);
 const petService = new PetService(petRepository);
 const paymentService = new PaymentService(paymentRepository);
+const notificationService = new NotificationService(notificationRepository);
+const adminAnalyticsService = new AdminAnalyticsService();
 const pdfService = new PdfService();
-const prescriptionService = new PrescriptionService(prescriptionRepository, appointmentRepository, doctorRepository, pdfService);
-const appointmentService = new AppointmentService(appointmentRepository, doctorRepository, petRepository, paymentService, prescriptionRepository);
+const prescriptionService = new PrescriptionService(prescriptionRepository, appointmentRepository, doctorRepository, pdfService, notificationService);
+const appointmentService = new AppointmentService(appointmentRepository, doctorRepository, petRepository, paymentService, prescriptionRepository, notificationService);
 const aiAssistantService = new AiAssistantService(petRepository, doctorRepository, specialtyRepository);
 const reviewService = new ReviewService(reviewRepository, appointmentRepository, doctorRepository);
 
@@ -71,6 +79,8 @@ const paymentController = new PaymentController(paymentService);
 const prescriptionController = new PrescriptionController(prescriptionService);
 const aiAssistantController = new AiAssistantController(aiAssistantService);
 const reviewController = new ReviewController(reviewService);
+const notificationController = new NotificationController(notificationService);
+const adminAnalyticsController = new AdminAnalyticsController(adminAnalyticsService);
 
 export {
     authController,
@@ -84,5 +94,7 @@ export {
     paymentController,
     prescriptionController,
     aiAssistantController,
-    reviewController
+    reviewController,
+    notificationController,
+    adminAnalyticsController
 };

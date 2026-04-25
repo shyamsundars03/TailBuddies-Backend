@@ -5,5 +5,6 @@ export enum AppointmentStatus {
     CANCEL_REQUEST = 'cancel request',
     REFUND_REQUEST = 'refund request',
     COMPLETED = 'completed',
-    PAYMENT_PENDING = 'payment pending'
+    PAYMENT_PENDING = 'payment pending',
+    ONGOING = 'ongoing'
 }

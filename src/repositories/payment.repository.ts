@@ -65,7 +65,26 @@ export class PaymentRepository implements IPaymentRepository {
                 query.source = 'appointment-payment';
             } else if (status.toLowerCase() === 'refunded') {
                 query.source = { $in: ['consultation-refund', 'prescription-refund', 'refund'] };
+            } else if (status.toUpperCase() === 'PENDING') {
+                query.status = 'PENDING';
             }
+        }
+
+        if (search) {
+            // Find users matching search
+            const users = await WalletTransaction.db.model('User').find({
+                username: { $regex: search, $options: 'i' }
+            }).select('_id');
+
+            // Find wallets for those users
+            const wallets = await WalletTransaction.db.model('Wallet').find({
+                userId: { $in: users.map((u: any) => u._id) }
+            }).select('_id');
+
+            query.$or = [
+                { transactionID: { $regex: search, $options: 'i' } },
+                { walletID: { $in: wallets.map((w: any) => w._id) } }
+            ];
         }
 
         const [transactions, total] = await Promise.all([

@@ -16,4 +16,5 @@ export interface IPetRepository {
    
    
     deletePet(id: string): Promise<boolean>;
+    findIdsByName(name: string): Promise<string[]>;
 }
