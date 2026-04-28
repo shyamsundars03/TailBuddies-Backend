@@ -91,7 +91,7 @@ export class PaymentRepository implements IPaymentRepository {
             WalletTransaction.find(query)
                 .populate({
                     path: 'walletID',
-                    populate: { path: 'userId', select: 'username email profilePic' }
+                    populate: { path: 'userId', select: 'username email profilePic role' }
                 })
                 .populate('appointmentID')
                 .sort({ createdAt: -1 })
@@ -106,7 +106,7 @@ export class PaymentRepository implements IPaymentRepository {
         return await WalletTransaction.findById(id)
             .populate({
                 path: 'walletID',
-                populate: { path: 'userId', select: 'username email profilePic' }
+                populate: { path: 'userId', select: 'username email profilePic role' }
             })
             .populate({
                 path: 'appointmentID',

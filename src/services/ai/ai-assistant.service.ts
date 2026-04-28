@@ -30,14 +30,20 @@ export class AiAssistantService {
             throw new Error("Unauthorized access to this pet");
         }
 
-        // 2. Prepare Prompt
-        const prompt = `You are an expert AI Veterinary Assistant. 
+        // 2. Fetch Available Specialties for Context
+        const availableSpecialties = await (this.specialtyRepository as any).findAll();
+        const specialtyNames = (availableSpecialties as any[]).map(s => s.name).join(', ');
+
+        // 3. Prepare Prompt
+        const prompt = `You are an expert AI Veterinary Assistant for TailBuddies. 
         Pet Name: ${pet.name}. 
         Category: ${category}. 
         Symptoms/Description: ${description}.
         
+        AVAILABLE SPECIALTIES IN OUR SYSTEM: ${specialtyNames}
+
         Please provide a helpful response in TWO parts:
-        1. An EXACT veterinary specialty (e.g., Dermatologist, Cardiologist, General Vet, etc.) that best fits this issue. Return only the single most relevant specialty name.
+        1. An EXACT veterinary specialty from our available list that best fits this issue. Return ONLY the name.
         2. A one-week home care and observation plan (Markdown format).
         
         FORMAT YOUR RESPONSE EXACTLY LIKE THIS:

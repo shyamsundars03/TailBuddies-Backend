@@ -173,7 +173,7 @@ console.log("afaf",result)
             const limit = parseInt(String(req.query.limit || '10'));
             const role = req.query.role ? String(req.query.role) : undefined;
             const search = req.query.search ? String(req.query.search) : undefined;
-            const result = await this._adminService.getUsers(page, limit, role, search);
+            const result = await this._adminService.getUsersWithDetails(page, limit, role, search);
             res.status(HttpStatus.OK).json({ success: true, data: result });
 
 

@@ -8,7 +8,7 @@ export interface ISlot extends Document {
     endTime: string;   // e.g., "09:30"
     isBooked: boolean;
     isBlocked: boolean;
-    status: 'available' | 'booked' | 'confirmed' | 'cancelled' | 'completed';
+    status: 'available' | 'booked' | 'confirmed' | 'cancelled' | 'completed' | 'unavailable';
     slotType: ServiceType;
     createdAt: Date;
     updatedAt: Date;
@@ -29,7 +29,7 @@ const slotSchema = new Schema<ISlot>(
         },
         status: {
             type: String,
-            enum: ['available', 'booked', 'confirmed', 'cancelled', 'completed'],
+            enum: ['available', 'booked', 'confirmed', 'cancelled', 'completed', 'unavailable'],
             default: 'available'
         },
     },

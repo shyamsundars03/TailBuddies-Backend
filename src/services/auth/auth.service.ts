@@ -475,7 +475,7 @@ export class AuthService implements IAuthService {
 
     const isMatch = await bcrypt.compare(currentPassword, userWithPassword.password);
     if (!isMatch) {
-      throw new Error(ErrorMessages.INVALID_CREDENTIALS);
+      throw new Error(ErrorMessages.INVALID_CURRENT_PASSWORD);
     }
 
     userWithPassword.password = newPassword;

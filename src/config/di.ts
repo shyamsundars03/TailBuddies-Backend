@@ -37,6 +37,11 @@ import { NotificationService } from '../services/notification.service';
 import { NotificationController } from '../controllers/notification.controller';
 import { AdminAnalyticsService } from '../services/admin-analytics.service';
 import { AdminAnalyticsController } from '../controllers/admin/admin-analytics.controller';
+import { SlotRepository } from '../repositories/SlotRepository';
+
+import { SlotService } from '../services/SlotService';
+import { SlotController } from '../controllers/doctor/slot.controller';
+
 
 // Repositories
 const userRepository = new UserRepository();
@@ -49,6 +54,8 @@ const paymentRepository = new PaymentRepository();
 const prescriptionRepository = new PrescriptionRepository();
 const reviewRepository = new ReviewRepository();
 const notificationRepository = new NotificationRepository();
+const slotRepository = new SlotRepository();
+
 
 // Services
 const jwtService = new JwtService();
@@ -60,12 +67,17 @@ const doctorService = new DoctorService(doctorRepository, specialtyRepository);
 const petService = new PetService(petRepository);
 const paymentService = new PaymentService(paymentRepository);
 const notificationService = new NotificationService(notificationRepository);
+import { NotificationHelper } from '../utils/notification-helper';
+NotificationHelper.init(notificationService);
+
 const adminAnalyticsService = new AdminAnalyticsService();
 const pdfService = new PdfService();
 const prescriptionService = new PrescriptionService(prescriptionRepository, appointmentRepository, doctorRepository, pdfService, notificationService);
 const appointmentService = new AppointmentService(appointmentRepository, doctorRepository, petRepository, paymentService, prescriptionRepository, notificationService);
 const aiAssistantService = new AiAssistantService(petRepository, doctorRepository, specialtyRepository);
 const reviewService = new ReviewService(reviewRepository, appointmentRepository, doctorRepository);
+const slotService = new SlotService(slotRepository, doctorRepository, appointmentService);
+
 
 // Controllers
 const authController = new AuthController(authService);
@@ -81,6 +93,8 @@ const aiAssistantController = new AiAssistantController(aiAssistantService);
 const reviewController = new ReviewController(reviewService);
 const notificationController = new NotificationController(notificationService);
 const adminAnalyticsController = new AdminAnalyticsController(adminAnalyticsService);
+const slotController = new SlotController(slotService);
+
 
 export {
     authController,
@@ -96,5 +110,7 @@ export {
     aiAssistantController,
     reviewController,
     notificationController,
-    adminAnalyticsController
+    adminAnalyticsController,
+    slotController
 };
+

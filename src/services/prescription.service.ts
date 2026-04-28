@@ -143,9 +143,36 @@ export class PrescriptionService implements IPrescriptionService {
 
     async getPrescriptionById(id: string): Promise<{ success: boolean; data?: IPrescription; message?: string }> {
         try {
-            const prescription = await this._prescriptionRepository.findById(id);
+            let idToUse = id;
+            if (idToUse.includes('{') || idToUse.includes('ObjectId')) {
+                const idMatch = idToUse.match(/_id:\s*(?:new\s+ObjectId\()?['"]?([a-f\d]{24})['"]?/i);
+                if (idMatch) {
+                    idToUse = idMatch[1];
+                }
+            }
+            
+            const model = (this._prescriptionRepository as any)._model;
+            const query: any = {
+                $or: [
+                    { prescriptionId: idToUse }
+                ]
+            };
+
+            if (mongoose.Types.ObjectId.isValid(idToUse)) {
+                query.$or.push({ _id: new mongoose.Types.ObjectId(idToUse) });
+                query.$or.push({ appointmentId: new mongoose.Types.ObjectId(idToUse) });
+            } else {
+                query.$or.push({ _id: idToUse as any });
+                query.$or.push({ appointmentId: idToUse as any });
+            }
+
+            const prescription = await model.findOne(query)
+                .populate({ path: 'vetId', populate: { path: 'userId' } })
+                .populate('petId')
+                .sort({ createdAt: -1 });
+
             if (!prescription) {
-                return { success: false, message: 'Prescription not found' };
+                return { success: false, message: `Prescription not found for ID: ${idToUse}` };
             }
             return { success: true, data: prescription };
         } catch (error: any) {
@@ -155,11 +182,56 @@ export class PrescriptionService implements IPrescriptionService {
 
     async generatePrescriptionPdf(prescriptionId: string): Promise<{ success: boolean; data?: Buffer; message?: string }> {
         try {
-            const prescription = await this._prescriptionRepository.findById(prescriptionId);
-            if (!prescription) return { success: false, message: 'Prescription not found' };
+            let idToUse = prescriptionId;
+            if (idToUse.includes('{') || idToUse.includes('ObjectId')) {
+                const idMatch = idToUse.match(/_id:\s*(?:new\s+ObjectId\()?['"]?([a-f\d]{24})['"]?/i);
+                if (idMatch) {
+                    idToUse = idMatch[1];
+                }
+            }
 
-            const appointment = await this._appointmentRepository.findWithDetails({ _id: prescription.appointmentId });
-            if (!appointment || appointment.length === 0) return { success: false, message: 'Appointment not found' };
+            const model = (this._prescriptionRepository as any)._model;
+            const query: any = {
+                $or: [
+                    { prescriptionId: idToUse }
+                ]
+            };
+
+            if (mongoose.Types.ObjectId.isValid(idToUse)) {
+                query.$or.push({ _id: new mongoose.Types.ObjectId(idToUse) });
+                query.$or.push({ appointmentId: new mongoose.Types.ObjectId(idToUse) });
+            } else {
+                query.$or.push({ _id: idToUse as any });
+                query.$or.push({ appointmentId: idToUse as any });
+            }
+
+            const prescription = await model.findOne(query);
+
+            if (!prescription) {
+                return { success: false, message: `Record not found for ID: ${idToUse}` };
+            }
+
+            let apptIdToUse = prescription.appointmentId.toString();
+            if (apptIdToUse.includes('{') || apptIdToUse.includes('ObjectId')) {
+                const apptIdMatch = apptIdToUse.match(/_id:\s*(?:new\s+ObjectId\()?['"]?([a-f\d]{24})['"]?/i);
+                if (apptIdMatch) {
+                    apptIdToUse = apptIdMatch[1];
+                }
+            }
+
+            const apptQuery = mongoose.Types.ObjectId.isValid(apptIdToUse) 
+                ? { _id: new mongoose.Types.ObjectId(apptIdToUse) }
+                : { _id: apptIdToUse };
+
+            const appointment = await this._appointmentRepository.findWithDetails(apptQuery);
+            if (!appointment || appointment.length === 0) {
+                const directAppt = await this._appointmentRepository.findById(apptIdToUse);
+                if (directAppt) {
+                    const pdfBuffer = await this._pdfService.generatePrescriptionPdf(prescription, directAppt);
+                    return { success: true, data: pdfBuffer };
+                }
+                return { success: false, message: 'Appointment not found' };
+            }
 
             const pdfBuffer = await this._pdfService.generatePrescriptionPdf(prescription, appointment[0]);
             return { success: true, data: pdfBuffer };

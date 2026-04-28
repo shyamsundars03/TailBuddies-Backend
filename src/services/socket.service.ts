@@ -49,6 +49,10 @@ export class SocketService {
         this._io.on('connection', (socket: AuthenticatedSocket) => {
             logger.info(`User connected: ${socket.userId} (${socket.id})`);
 
+            if (socket.userId) {
+                socket.join(`user:${socket.userId}`);
+            }
+
             socket.on('join-room', (appointmentId: string) => {
                 socket.join(`appointment:${appointmentId}`);
                 logger.info(`User ${socket.userId} joined room appointment:${appointmentId}`);
@@ -119,6 +123,12 @@ export class SocketService {
                 logger.info(`User disconnected: ${socket.userId}`);
             });
         });
+    }
+
+    public static emitToUser(userId: string, event: string, data: any) {
+        if (this._io) {
+            this._io.to(`user:${userId}`).emit(event, data);
+        }
     }
 
     public static get io() {

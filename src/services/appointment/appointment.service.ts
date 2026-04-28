@@ -13,6 +13,8 @@ import mongoose from 'mongoose';
 import logger from '../../logger';
 import { SocketService } from '../socket.service';
 import cron from 'node-cron';
+import { NotificationHelper } from '../../utils/notification-helper';
+import { ServiceType } from '../../enums/service-type.enum';
 
 export class AppointmentService implements IAppointmentService {
 
@@ -44,16 +46,50 @@ export class AppointmentService implements IAppointmentService {
 
     private initializeCronJobs() {
         cron.schedule('* * * * *', async () => {
-            logger.info('Running background job: autoCancelMissedAppointments');
+            logger.info('Running background job: autoCancelMissedAppointments and Reminders');
             try {
-                const result = await this.autoCancelMissedAppointments();
-                if (result.cancelledCount > 0) {
-                    logger.info(`Cron job processed ${result.cancelledCount} appointments.`);
-                }
+                await this.autoCancelMissedAppointments();
+                await this.sendAppointmentReminders();
             } catch (err) {
-                logger.error('Error in autoCancelMissedAppointments cron:', err);
+                logger.error('Error in background cron jobs:', err);
             }
         });
+    }
+
+    private async sendAppointmentReminders() {
+        try {
+            const now = new Date();
+            const reminderTime = new Date(now.getTime() + 5 * 60 * 1000);
+            
+            const startH = reminderTime.getHours().toString().padStart(2, '0');
+            const startM = reminderTime.getMinutes().toString().padStart(2, '0');
+            const timeStr = `${startH}:${startM}`;
+
+            const appointments = await (this._appointmentRepository as any).model.find({
+                appointmentDate: {
+                    $gte: new Date(reminderTime.getFullYear(), reminderTime.getMonth(), reminderTime.getDate()),
+                    $lt: new Date(reminderTime.getFullYear(), reminderTime.getMonth(), reminderTime.getDate() + 1)
+                },
+                appointmentStartTime: timeStr,
+                status: { $in: [AppointmentStatus.BOOKED, AppointmentStatus.CONFIRMED] }
+            }).populate('petId').populate('doctorId');
+
+            for (const appt of appointments) {
+                const pet = appt.petId as any;
+                const doctor = appt.doctorId as any;
+                if (pet && doctor) {
+                    await NotificationHelper.notifyAppointmentReminder(
+                        this.extractId(appt.ownerId),
+                        this.extractId(doctor.userId),
+                        pet.name,
+                        appt.appointmentStartTime,
+                        appt._id.toString()
+                    );
+                }
+            }
+        } catch (error) {
+            logger.error('Error in sendAppointmentReminders:', error);
+        }
     }
 
     private extractId(value: any): string {
@@ -128,20 +164,24 @@ export class AppointmentService implements IAppointmentService {
 
             await session.commitTransaction();
 
-            try {
-                const doctor = await this._doctorRepository.findById(data.doctorId);
-                if (doctor) {
-                    const pet = await this._petRepository.findById(data.petId);
-                    await this._notificationService.createNotification(
-                        this.extractId(doctor.userId),
-                        'New Appointment Booking',
-                        `A new appointment for ${pet?.name || 'a pet'} has been booked for ${data.appointmentStartTime} on ${new Date(data.appointmentDate).toLocaleDateString()}.`,
-                        'appointment',
-                        `/doctor/appointments/${appointment._id}`
-                    );
+            if (appointment.status === AppointmentStatus.BOOKED) {
+                try {
+                    const doctor = await this._doctorRepository.findById(data.doctorId);
+                    if (doctor) {
+                        const pet = await this._petRepository.findById(data.petId);
+                        await NotificationHelper.notifyAppointmentBooked(
+                            this.extractId(appointment.ownerId),
+                            this.extractId(doctor._id),
+                            this.extractId(doctor.userId),
+                            pet?.name || 'a pet',
+                            new Date(data.appointmentDate).toLocaleDateString(),
+                            data.appointmentStartTime,
+                            appointment._id.toString()
+                        );
+                    }
+                } catch (notiError) {
+                    logger.error('Error creating notification for new appointment', { notiError });
                 }
-            } catch (notiError) {
-                logger.error('Error creating notification for new appointment', { notiError });
             }
 
             return { success: true, data: appointment };
@@ -292,37 +332,35 @@ export class AppointmentService implements IAppointmentService {
                 const doctor = await this._doctorRepository.findById(this.extractId(appointment.doctorId));
                 const doctorUser = doctor?.userId as any;
                 const doctorName = doctorUser?.username || 'Doctor';
-                
-                let title = 'Appointment Update';
-                let message = `Your appointment for ${pet?.name || 'pet'} status has been updated to ${status}.`;
-                
+                const dateStr = new Date(appointment.appointmentDate).toLocaleDateString();
+
                 if (status === AppointmentStatus.CONFIRMED) {
-                    title = 'Appointment Confirmed';
-                    message = `Great! Your appointment for ${pet?.name} with Dr. ${doctorName} has been confirmed for ${appointment.appointmentStartTime} on ${new Date(appointment.appointmentDate).toLocaleDateString()}.`;
-                } else if (status === AppointmentStatus.COMPLETED) {
-                    title = 'Appointment Completed';
-                    message = `Your consultation with Dr. ${doctorName} for ${pet?.name} is now complete. You can view the prescription in your dashboard.`;
-                } else if (status === AppointmentStatus.CANCELLED) {
-                    title = 'Appointment Cancelled';
-                    message = `We regret to inform you that the appointment for ${pet?.name} has been cancelled. If any payment was made, it will be refunded.`;
-                }
-
-            
-                await this._notificationService.createNotification(
-                    this.extractId(appointment.ownerId),
-                    title,
-                    message,
-                    'appointment',
-                    `/owner/appointments/${appointment._id}`
-                );
-
-                if (status === AppointmentStatus.CANCELLED) {
-                    await this._notificationService.createNotification(
+                    await NotificationHelper.notifyAppointmentConfirmed(
+                        this.extractId(appointment.ownerId),
                         this.extractId(doctor?.userId),
-                        'Appointment Cancelled',
-                        `The appointment for ${pet?.name} on ${new Date(appointment.appointmentDate).toLocaleDateString()} has been cancelled.`,
-                        'appointment',
-                        `/doctor/appointments/${appointment._id}`
+                        pet?.name || 'pet',
+                        doctorName,
+                        dateStr,
+                        appointment.appointmentStartTime,
+                        appointment._id.toString()
+                    );
+                } else if (status === AppointmentStatus.COMPLETED) {
+                    await NotificationHelper.notifyAppointmentCompleted(
+                        this.extractId(appointment.ownerId),
+                        this.extractId(doctor?.userId),
+                        pet?.name || 'pet',
+                        doctorName,
+                        appointment._id.toString()
+                    );
+                } else if (status === AppointmentStatus.CANCELLED) {
+                    await NotificationHelper.notifyAppointmentCancelled(
+                        this.extractId(appointment.ownerId),
+                        this.extractId(doctor?.userId),
+                        pet?.name || 'pet',
+                        dateStr,
+                        'Status updated to cancelled',
+                        appointment._id.toString(),
+                        'doctor' // Assuming status update to cancelled is usually by doctor/admin
                     );
                 }
             } catch (notiError) {
@@ -335,9 +373,14 @@ export class AppointmentService implements IAppointmentService {
         }
     }
 
-    async cancelAppointment(appointmentId: string, userId: string, reason: string): Promise<{ success: boolean; message: string }> {
-        const session = await mongoose.startSession();
-        session.startTransaction();
+    async cancelAppointment(appointmentId: string, userId: string, reason: string, providedSession?: any): Promise<{ success: boolean; message: string }> {
+        const session = providedSession || await mongoose.startSession();
+        const isInternalSession = !providedSession;
+
+        if (isInternalSession) {
+            session.startTransaction();
+        }
+
         try {
             const appointment = await this._appointmentRepository.findById(appointmentId);
             if (!appointment) throw new Error('Appointment not found');
@@ -375,14 +418,14 @@ export class AppointmentService implements IAppointmentService {
                 shouldRefund = true;
                 finalReason = `${userIsDoctor ? 'Doctor early cancellation' : 'Owner early cancellation'} - ${reason}`;
             }
- 
+
             else if (now >= apptStart && now <= graceEnd) {
                 if (userIsDoctor) {
-                   
+
                     shouldRefund = true;
                     finalReason = `cancellation by doctor side - ${reason}`;
                 } else {
-                 
+
                     shouldRefund = false;
                     const doctorCheckedIn = !!appointment.checkIn?.vetCheckInTime;
                     finalReason = `${doctorCheckedIn
@@ -390,7 +433,7 @@ export class AppointmentService implements IAppointmentService {
                         : 'cancelled by owner during appointment time before doctor checkin'} - ${reason}`;
                 }
             }
-          
+
             else {
                 if (appointment.status === AppointmentStatus.ONGOING) {
                     throw new Error('No cancellation available for this situation - Appointment is already ongoing.');
@@ -406,7 +449,7 @@ export class AppointmentService implements IAppointmentService {
                 refundTriggered = true;
             }
 
-           
+
             await Appointment.findByIdAndUpdate(appointmentId, {
                 status: AppointmentStatus.CANCELLED,
                 cancellation: {
@@ -421,15 +464,46 @@ export class AppointmentService implements IAppointmentService {
                 await Slot.findByIdAndUpdate(appointment.slotId, { isBooked: false, status: 'available' }, { session });
             }
 
-            await session.commitTransaction();
+            if (isInternalSession) {
+                await session.commitTransaction();
+            }
+
+            // Notify parties
+            try {
+                const pet = await this._petRepository.findById(this.extractId(appointment.petId));
+                const doctorProfile = await this._doctorRepository.findById(this.extractId(appointment.doctorId));
+                const doctorUserId = doctorProfile ? this.extractId(doctorProfile.userId) : '';
+                const dateStr = new Date(appointment.appointmentDate).toLocaleDateString();
+
+                // Identify who cancelled
+                const isDoctor = userId === doctorUserId || userId === doctorProfile?._id.toString();
+
+                await NotificationHelper.notifyAppointmentCancelled(
+                    this.extractId(appointment.ownerId),
+                    doctorUserId,
+                    pet?.name || 'pet',
+                    dateStr,
+                    finalReason,
+                    appointment._id.toString(),
+                    isDoctor ? 'doctor' : 'owner'
+                );
+            } catch (notiErr) {
+                logger.error('Error sending cancellation notification', notiErr);
+            }
+
             return { success: true, message: 'Appointment cancelled successfully' };
         } catch (error: any) {
-            await session.abortTransaction();
+            if (isInternalSession) {
+                await session.abortTransaction();
+            }
             return { success: false, message: error.message };
         } finally {
-            session.endSession();
+            if (isInternalSession) {
+                session.endSession();
+            }
         }
     }
+
 
     async getAvailableSlots(doctorId: string, date: any): Promise<{ success: boolean; data?: ISlot[]; message?: string }> {
         try {
@@ -988,6 +1062,23 @@ export class AppointmentService implements IAppointmentService {
                     appt.paymentStatus = 'PAID';
                     logger.info(`Manually completed COD appointment ${appt.appointmentId}: Payment marked as PAID`);
                 }
+
+                // Trigger formal notification
+                try {
+                    const doc: any = await (this._appointmentRepository as any).model.db.model('Doctor').findById(appt.doctorId).populate('userId');
+                    const doctorName = doc?.userId?.username || 'Doctor';
+                    const doctorUserId = doc?.userId?._id?.toString() || doc?.userId?.toString();
+                    
+                    await NotificationHelper.notifyAppointmentCompleted(
+                        this.extractId(appt.ownerId),
+                        doctorUserId,
+                        (appt.petId as any)?.name || 'pet',
+                        doctorName,
+                        appt._id.toString()
+                    );
+                } catch (notiErr) {
+                    logger.error('Error sending completion notification in checkOut:', notiErr);
+                }
             }
             appt.markModified('checkOut');
             await appt.save();
@@ -1242,6 +1333,72 @@ export class AppointmentService implements IAppointmentService {
         } catch (error: any) {
             logger.error('Error checking slot availability:', { id, error: error.message });
             return { success: false, available: false, message: error.message };
+        }
+    }
+
+    async getAllSlotsForDoctor(userId: string, date: any): Promise<{ success: boolean; data?: any[]; message?: string }> {
+        try {
+            const doctor = await this._doctorRepository.findByUserId(userId);
+            if (!doctor) throw new Error('Doctor profile not found');
+
+            const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const startOfDay = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+            
+            const searchStart = new Date(startOfDay.getTime() - (6 * 60 * 60 * 1000)); 
+            const searchEnd = new Date(startOfDay.getTime() + (30 * 60 * 60 * 1000));
+
+            // Ensure slots exist for this day
+            await this.getAvailableSlots(doctor._id.toString(), date);
+
+            const slots = await Slot.find({
+                vetId: doctor._id,
+                date: { $gte: searchStart, $lte: searchEnd }
+            }).sort({ startTime: 1 });
+
+            const daySlots = slots.filter((s: any) => {
+                const sDate = new Date(s.date);
+                const diffHours = Math.abs(sDate.getTime() - startOfDay.getTime()) / (1000 * 60 * 60);
+                return diffHours < 12;
+            });
+
+            const populatedSlots = await Promise.all(daySlots.map(async (slot) => {
+                const slotObj = slot.toObject() as any;
+                if (slot.isBooked) {
+                    const appointment = await Appointment.findOne({ 
+                        slotId: slot._id,
+                        status: { $ne: AppointmentStatus.CANCELLED }
+                    });
+                    if (appointment) {
+                        slotObj.mode = appointment.mode;
+                        slotObj.appointmentId = appointment._id;
+                        slotObj.status = 'Appointment';
+                    } else {
+                        slotObj.status = 'Booked';
+                    }
+                } else if (slot.isBlocked) {
+                    slotObj.status = 'Blocked';
+                } else if (slot.slotType === ServiceType.SUBSCRIPTION) { 
+                     slotObj.status = 'Subscription';
+                } else {
+                    // Check for cancelled appointments to show in Red
+                    const cancelledAppt = await Appointment.findOne({
+                        slotId: slot._id,
+                        status: AppointmentStatus.CANCELLED
+                    });
+                    if (cancelledAppt) {
+                        slotObj.status = 'cancelled';
+                    } else {
+                        slotObj.status = 'Available';
+                    }
+                }
+                return slotObj;
+            }));
+
+            return { success: true, data: populatedSlots };
+        } catch (error: any) {
+            logger.error(`[AppointmentService] Error in getAllSlotsForDoctor:`, error);
+            return { success: false, message: error.message };
         }
     }
 }

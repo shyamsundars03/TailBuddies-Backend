@@ -8,7 +8,7 @@ export interface IAppointmentService {
     getAppointmentsByDoctor(doctorId: string, status?: string, page?: number, limit?: number, search?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }>;
     getAllAppointments(page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }>;
     updateAppointmentStatus(appointmentId: string, status: AppointmentStatus, userId: string): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
-    cancelAppointment(appointmentId: string, userId: string, reason: string): Promise<{ success: boolean; message: string }>;
+    cancelAppointment(appointmentId: string, userId: string, reason: string, session?: any): Promise<{ success: boolean; message: string }>;
     getAvailableSlots(doctorId: string, date: Date): Promise<{ success: boolean; data?: ISlot[]; message?: string }>;
     getAppointmentById(id: string): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
     checkIn(appointmentId: string, role: 'owner' | 'doctor'): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
@@ -18,6 +18,7 @@ export interface IAppointmentService {
     getOwnerStats(ownerId: string): Promise<{ success: boolean; stats?: any; message?: string }>;
     cancelPendingAppointment(appointmentId: string): Promise<{ success: boolean; message?: string }>;
     checkSlotAvailability(appointmentId: string): Promise<{ success: boolean; available: boolean; message?: string }>;
+    getAllSlotsForDoctor(userId: string, date: any): Promise<{ success: boolean; data?: any[]; message?: string }>;
 }
 // sendMessage(appointmentId: string, senderId: string, senderRole: 'owner' | 'doctor', message: string): Promise<{ success: boolean; data?: any; message?: string }>;
 // }

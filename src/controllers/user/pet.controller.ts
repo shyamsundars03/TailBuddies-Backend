@@ -107,7 +107,9 @@ export class UserPetController {
             }
 
             const pet = await this._petService.getPetById(id);
-            if (pet.ownerId._id.toString() !== userId) {
+            const userRole = req.user?.role;
+            
+            if (userRole !== 'doctor' && pet.ownerId._id.toString() !== userId) {
                 res.status(HttpStatus.FORBIDDEN).json({ success: false, message: 'Forbidden' });
                 return;
             }

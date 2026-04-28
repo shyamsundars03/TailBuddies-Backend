@@ -12,6 +12,7 @@ export interface IAdminService {
     deleteSpecialty(id: string): Promise<boolean>;
 
     // User Management
-    getUsers(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number, ownerCount: number, doctorCount: number }>;
+    getUsers(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number }>;
+    getUsersWithDetails(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number, ownerCount: number, doctorCount: number }>;
     toggleUserBlock(id: string): Promise<IUser | null>;
 }

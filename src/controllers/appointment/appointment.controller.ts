@@ -438,4 +438,24 @@ export class AppointmentController {
             res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
         }
     };
+
+    getDoctorSlots = async (req: AuthRequest, res: Response): Promise<void> => {
+        try {
+            const userId = req.user?.userId;
+            if (!userId) {
+                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+                return;
+            }
+            const { date } = req.query;
+            const result = await this._appointmentService.getAllSlotsForDoctor(userId, date as string);
+            if (result.success) {
+                res.status(HttpStatus.OK).json(result);
+                return;
+            }
+            res.status(HttpStatus.BAD_REQUEST).json(result);
+        } catch (error: any) {
+            logger.error('Error fetching doctor slots', { error: error.message });
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+        }
+    };
 }

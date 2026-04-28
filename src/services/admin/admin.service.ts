@@ -175,10 +175,26 @@ export class AdminService implements IAdminService {
 
 
     // User Management
-    async getUsers(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number, ownerCount: number, doctorCount: number }> {
-        
-        
-        
+    async getUsers(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number }> {
+        const filter: Record<string, any> = {};
+        if (role) filter.role = role;
+        if (search) {
+            filter.$or = [
+                { username: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } }
+            ];
+        }
+        const options = {
+            skip: (page - 1) * limit,
+            limit: limit,
+            sort: { createdAt: -1 }
+        };
+        const users = await this._userRepository.findAll(filter, options);
+        const total = await (this._userRepository as any)._model.countDocuments(filter);
+        return { users, total };
+    }
+
+    async getUsersWithDetails(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number, ownerCount: number, doctorCount: number }> {
         const filter: Record<string, any> = {};
         if (role) filter.role = role;
 
@@ -197,13 +213,32 @@ export class AdminService implements IAdminService {
 
         const users = await this._userRepository.findAll(filter, options);
 
-        
+        // Fetch doctor details for doctors to get their specialty
+        const usersWithDetails = await Promise.all(users.map(async (user: any) => {
+            const userData = user.toObject ? user.toObject() : user;
+            if (userData.role === UserRole.DOCTOR) {
+                const { Doctor } = require('../../models/doctor.model');
+                const doctor = await Doctor.findOne({ userId: userData._id })
+                    .populate('profile.specialtyId');
+                
+                return {
+                    ...userData,
+                    id: userData._id.toString(),
+                    specialty: doctor?.profile?.specialtyId?.name || 'Not Set'
+                };
+            }
+            return {
+                ...userData,
+                id: userData._id.toString()
+            };
+        }));
+
         const userModel = (this._userRepository as unknown as { _model: { countDocuments: Function } })._model;
         const total = await userModel.countDocuments(filter);
         const ownerCount = await userModel.countDocuments({ role: UserRole.OWNER });
         const doctorCount = await userModel.countDocuments({ role: UserRole.DOCTOR });
 
-        return { users, total, ownerCount, doctorCount };
+        return { users: usersWithDetails, total, ownerCount, doctorCount };
     }
 
 

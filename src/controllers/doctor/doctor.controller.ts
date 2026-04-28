@@ -151,10 +151,11 @@ export class DoctorController {
             const page = parseInt(String(req.query.page)) || 1;
             const search = typeof req.query.search === 'string' ? req.query.search : undefined;
             const status = typeof req.query.status === 'string' ? req.query.status : undefined;
-            
+            const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : undefined;
+
             const isAdmin = (req as any).user?.role === 'admin';
             const limit = parseInt(String(req.query.limit)) || (isAdmin ? 10 : 9);
-            
+
             let isVerified = req.query.isVerified !== undefined ? String(req.query.isVerified) === 'true' : undefined;
             if (!isAdmin && isVerified === undefined) {
                 isVerified = true;
@@ -164,11 +165,12 @@ export class DoctorController {
                 specialty: req.query.specialty,
                 gender: req.query.gender,
                 experienceYears: req.query.experienceYears,
-                city: req.query.city
+                city: req.query.city,
+                minRating: req.query.minRating
             };
 
-            logger.info(`[DoctorController] Fetching doctors: page=${page}, limit=${limit}, search=${search}, isVerified=${isVerified}`);
-            const result = await this._doctorService.getAllDoctors(page, limit, search, isVerified, status, filters);
+            logger.info(`[DoctorController] Fetching doctors: page=${page}, limit=${limit}, search=${search}, isVerified=${isVerified}, sortBy=${sortBy}`);
+            const result = await this._doctorService.getAllDoctors(page, limit, search, isVerified, status, filters, sortBy);
 
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -265,5 +267,5 @@ export class DoctorController {
 
 
 
-    
+
 }

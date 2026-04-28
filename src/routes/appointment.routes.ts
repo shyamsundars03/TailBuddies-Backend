@@ -7,6 +7,12 @@ import logger from '../logger';
 const router = Router();
 logger.info('Appointment Routes Loading...');
 
+// Doctor routes (Move to top for priority)
+router.get('/doctor/slots', authMiddleware, appointmentController.getDoctorSlots);
+router.get('/doctor/patients', authMiddleware, appointmentController.getPatientsByDoctor);
+router.get('/doctor/stats', authMiddleware, appointmentController.getStats);
+router.get('/doctor', authMiddleware, appointmentController.getDoctorAppointments);
+
 // Admin routes
 router.get('/all', authMiddleware, appointmentController.getAll);
 
@@ -15,10 +21,6 @@ router.get('/', authMiddleware, appointmentController.getOwnerAppointments);
 router.get('/owner/stats', authMiddleware, appointmentController.getOwnerStats);
 router.post('/:id/cancel-pending', authMiddleware, appointmentController.cancelPendingAppointment);
 
-// Doctor routes
-router.get('/doctor', authMiddleware, appointmentController.getDoctorAppointments);
-router.get('/doctor/stats', authMiddleware, appointmentController.getStats);
-router.get('/doctor/patients', authMiddleware, appointmentController.getPatientsByDoctor);
 
 // Single Appointment
 router.get('/slots', authMiddleware, appointmentController.getAvailableSlots);

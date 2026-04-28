@@ -1,5 +1,6 @@
 import { INotification } from '../models/notification.model';
 import { INotificationRepository } from '../repositories/notification.repository';
+import { SocketService } from './socket.service';
 
 export interface INotificationService {
     createNotification(userId: string, title: string, message: string, type?: string, link?: string): Promise<INotification>;
@@ -16,7 +17,7 @@ export class NotificationService implements INotificationService {
     }
 
     async createNotification(userId: string, title: string, message: string, type: any = 'other', link?: string): Promise<INotification> {
-        return await this._notificationRepository.create({
+        const notification = await this._notificationRepository.create({
             recipientId: userId as any,
             title,
             message,
@@ -24,6 +25,11 @@ export class NotificationService implements INotificationService {
             link,
             status: 'unread'
         });
+
+        // Emit real-time socket event
+        SocketService.emitToUser(userId, 'new_notification', notification);
+
+        return notification;
     }
 
     async getNotifications(userId: string, status?: string): Promise<INotification[]> {

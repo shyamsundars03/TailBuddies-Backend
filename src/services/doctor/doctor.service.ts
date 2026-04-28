@@ -179,7 +179,7 @@ export class DoctorService implements IDoctorService {
 
         const updatedDoctor = await doctor.save();
 
-        
+
         try {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -275,10 +275,10 @@ export class DoctorService implements IDoctorService {
             throw new AppError('Profile not found. Please complete and save your basic details first.', HttpStatus.NOT_FOUND);
         }
 
-       
+
         const errors: string[] = [];
 
-        
+
         // if (!doctor.profile.designation) errors.push('Designation is required');
 
 
@@ -318,97 +318,92 @@ export class DoctorService implements IDoctorService {
 
 
 
-    async getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string, filters?: any): Promise<{ doctors: IDoctor[], total: number }> {
+    async getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string, filters?: any, sortBy?: string): Promise<{ doctors: IDoctor[], total: number }> {
         const filter: any = {};
 
 
+        const andFilters: any[] = [];
+
         if (isVerified !== undefined) {
-            filter.isVerified = isVerified;
+            andFilters.push({ isVerified });
         }
 
-
-
-
-
         if (isVerified === true) {
-            filter.isActive = true;
+            andFilters.push({ isActive: true });
         }
 
         if (status && status !== 'all') {
-            filter.profileStatus = status;
+            andFilters.push({ profileStatus: status });
         } else if (!isVerified) {
-
-            filter.profileStatus = { $in: ['under_review', 'verified', 'rejected'] };
+            andFilters.push({ profileStatus: { $in: ['under_review', 'verified', 'rejected'] } });
         }
-
 
         if (filters) {
             if (filters.specialty) {
-                filter['profile.specialtyId'] = filters.specialty;
+                andFilters.push({ 'profile.specialtyId': filters.specialty });
             }
 
             if (filters.experienceYears) {
-                filter['profile.experienceYears'] = { $gte: Number(filters.experienceYears) };
+                andFilters.push({ 'profile.experienceYears': { $gte: Number(filters.experienceYears) } });
             }
 
             if (filters.city) {
-                filter['clinicInfo.address.city'] = { $regex: filters.city, $options: 'i' };
+                andFilters.push({ 'clinicInfo.address.city': { $regex: filters.city, $options: 'i' } });
             }
 
             if (filters.minRating) {
-                filter.averageRating = { $gte: Number(filters.minRating) };
+                const rating = Number(filters.minRating);
+                if (!isNaN(rating)) {
+                    // Match the exact star bucket (e.g., 3 means [3.0, 4.0))
+                    andFilters.push({ averageRating: { $gte: rating, $lt: rating + 1 } });
+                }
             }
         }
 
-
         if (search) {
-
             const matchingUsers = await (this._doctorRepository as any)._model.db.model('User').find({
                 username: { $regex: search, $options: 'i' }
             }).select('_id');
 
-
             const userIds = matchingUsers.map((u: any) => u._id);
 
-
-
-            filter.$or = [
-                { userId: { $in: userIds } },
-                { 'profile.designation': { $regex: search, $options: 'i' } },
-                { 'clinicInfo.clinicName': { $regex: search, $options: 'i' } }
-            ];
-
-
+            andFilters.push({
+                $or: [
+                    { userId: { $in: userIds } },
+                    { 'profile.designation': { $regex: search, $options: 'i' } },
+                    { 'clinicInfo.clinicName': { $regex: search, $options: 'i' } }
+                ]
+            });
         }
-
-
-
 
         if (filters?.gender) {
             const genderUsers = await (this._doctorRepository as any)._model.db.model('User').find({
                 gender: { $regex: `^${filters.gender}$`, $options: 'i' }
             }).select('_id');
             const genderUserIds = genderUsers.map((u: any) => u._id);
-
-            filter.userId = { $in: genderUserIds };
-
-            
-            if (filter.$or) {
-                const searchOr = filter.$or;
-                delete filter.$or;
-                filter.$and = [
-                    { $or: searchOr },
-                    { userId: { $in: genderUserIds } }
-                ];
-            }
+            andFilters.push({ userId: { $in: genderUserIds } });
         }
 
-        // console.log(`[DoctorService] getAllDoctors final filter:`, JSON.stringify(filter));
+        if (andFilters.length > 0) {
+            filter.$and = andFilters;
+        }
+
+        // Sorting logic
+        let sort: any = { averageRating: -1, createdAt: -1 };
+        if (sortBy) {
+            if (sortBy === 'Price (Low to High)') {
+                sort = { 'profile.consultationFees': 1 };
+            } else if (sortBy === 'Price (High to Low)') {
+                sort = { 'profile.consultationFees': -1 };
+            } else if (sortBy === 'Rating') {
+                sort = { averageRating: -1 };
+            }
+        }
 
         const options = {
             skip: (page - 1) * limit,
             limit: limit,
-            sort: { averageRating: -1, createdAt: -1 } as any
+            sort: sort
         };
 
         const doctors = await (this._doctorRepository as any)._model.find(filter, null, options)

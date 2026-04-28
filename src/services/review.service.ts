@@ -12,7 +12,7 @@ export class ReviewService {
         private reviewRepository: IReviewRepository,
         private appointmentRepository: IAppointmentRepository,
         private doctorRepository: IDoctorRepository
-    ) {}
+    ) { }
 
     private countWords(str: string): number {
         return str.trim().split(/\s+/).filter(word => word.length > 0).length;
@@ -25,7 +25,7 @@ export class ReviewService {
             throw new AppError('Appointment ID and rating are required', HttpStatus.BAD_REQUEST);
         }
 
-       
+
         const appointment = await this.appointmentRepository.findById(appointmentId.toString());
         if (!appointment) {
             throw new AppError('Appointment not found', HttpStatus.NOT_FOUND);
@@ -36,31 +36,33 @@ export class ReviewService {
             throw new AppError('You are not authorized to review this appointment', HttpStatus.UNAUTHORIZED);
         }
 
-        
+
         if (appointment.status !== 'completed') {
             throw new AppError('You can only review completed appointments', HttpStatus.BAD_REQUEST);
         }
 
-        
+
         const existingReview = await this.reviewRepository.findByAppointmentId(appointmentId.toString());
         if (existingReview) {
             throw new AppError('You have already reviewed this appointment', HttpStatus.BAD_REQUEST);
         }
 
-        
+
         if (comment && this.countWords(comment) > 100) {
             throw new AppError('Comment cannot exceed 100 words', HttpStatus.BAD_REQUEST);
         }
 
+        const doctorId = (appointment.doctorId as any)._id || appointment.doctorId;
+
         const review = await this.reviewRepository.create({
             appointmentId: new mongoose.Types.ObjectId(appointmentId as any),
             ownerId: new mongoose.Types.ObjectId(ownerId),
-            doctorId: appointment.doctorId,
+            doctorId: new mongoose.Types.ObjectId(doctorId.toString()),
             rating,
             comment
         } as any);
 
-        await this.updateDoctorRating(appointment.doctorId.toString());
+        await this.updateDoctorRating(doctorId.toString());
 
         return await this.reviewRepository.findByIdWithPopulate(review._id.toString()) as IReview;
     }
@@ -80,7 +82,7 @@ export class ReviewService {
         }
 
         await this.reviewRepository.update(reviewId, data);
-        
+
         if (data.rating) {
             await this.updateDoctorRating(review.doctorId.toString());
         }
@@ -229,11 +231,11 @@ export class ReviewService {
             const doctorUserIds = await (this.reviewRepository as any)._model.db.model('User').find({
                 username: { $regex: search, $options: 'i' }
             }).select('_id');
-            
+
             const doctors = await (this.doctorRepository as any)._model.find({
                 userId: { $in: doctorUserIds.map((u: any) => u._id) }
             }).select('_id');
-            
+
             query.doctorId = { $in: doctors.map((d: any) => d._id) };
         }
         return await this.reviewRepository.findWithPagination(query, page, limit);
@@ -245,7 +247,7 @@ export class ReviewService {
             const users = await (this.reviewRepository as any)._model.db.model('User').find({
                 username: { $regex: search, $options: 'i' }
             }).select('_id');
-            
+
             const doctors = await (this.doctorRepository as any)._model.find({
                 userId: { $in: users.map((u: any) => u._id) }
             }).select('_id');
@@ -290,15 +292,27 @@ export class ReviewService {
     }
 
     private async updateDoctorRating(doctorId: string): Promise<void> {
-        const reviews = await this.reviewRepository.findByDoctorId(doctorId);
-        const count = reviews.length;
-        const average = count > 0 
-            ? reviews.reduce((acc, curr) => acc + curr.rating, 0) / count 
-            : 0;
+        try {
+            logger.info(`Recalculating rating for doctor: ${doctorId}`);
+            
+            const docIdObj = new mongoose.Types.ObjectId(doctorId);
+            const reviews = await this.reviewRepository.model.find({ doctorId: docIdObj });
+            
+            const count = reviews.length;
+            const average = count > 0
+                ? reviews.reduce((acc: number, curr: any) => acc + curr.rating, 0) / count
+                : 0;
 
-        await this.doctorRepository.update(doctorId, {
-            averageRating: parseFloat(average.toFixed(1)),
-            reviewCount: count
-        } as any);
+            const finalRating = Math.floor(average);
+            
+            await this.doctorRepository.update(doctorId, {
+                averageRating: finalRating,
+                reviewCount: count
+            } as any);
+            
+            logger.info(`Updated doctor ${doctorId}: Rating=${finalRating}, Reviews=${count}`);
+        } catch (error: any) {
+            logger.error(`Error updating doctor rating for ${doctorId}: ${error.message}`);
+        }
     }
 }

@@ -6,6 +6,7 @@ export const ErrorMessages = {
   UNAUTHORIZED: 'Unauthorized access',
   FORBIDDEN: 'Forbidden: Insufficient permissions',
   INVALID_CREDENTIALS: 'Invalid email or password',
+  INVALID_CURRENT_PASSWORD: 'Incorrect current password',
   TOKEN_MISSING: 'No token provided',
   TOKEN_INVALID: 'Invalid token',
   TOKEN_EXPIRED: 'Token expired',

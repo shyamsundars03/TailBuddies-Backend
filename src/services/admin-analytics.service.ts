@@ -19,42 +19,69 @@ export class AdminAnalyticsService implements IAdminAnalyticsService {
             Pet.countDocuments(),
             User.countDocuments({ role: 'owner' }),
             Appointment.aggregate([
-                { $match: { status: AppointmentStatus.COMPLETED } },
-                { $group: { _id: null, total: { $sum: "$amount" } } }
+                { $match: { status: AppointmentStatus.COMPLETED, paymentStatus: 'PAID' } },
+                { $group: { _id: null, total: { $sum: "$totalAmount" } } }
             ])
         ]);
 
         const totalRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
 
+        // Get data for the last 6 months
+        const monthsData = [];
+        const now = new Date();
         
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            monthsData.push({
+                month: d.getMonth() + 1,
+                year: d.getFullYear(),
+                label: d.toLocaleString('default', { month: 'short' }),
+                appointments: 0,
+                revenue: 0
+            });
+        }
 
-        const graphData = await Appointment.aggregate([
-            { $match: { createdAt: { $gte: sixMonthsAgo }, status: AppointmentStatus.COMPLETED } },
+        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+        const dbStats = await Appointment.aggregate([
+            { 
+                $match: { 
+                    createdAt: { $gte: sixMonthsAgo }, 
+                    status: AppointmentStatus.COMPLETED, 
+                    paymentStatus: 'PAID' 
+                } 
+            },
             {
                 $group: {
                     _id: { month: { $month: "$createdAt" }, year: { $year: "$createdAt" } },
                     appointments: { $sum: 1 },
-                    revenue: { $sum: "$amount" }
+                    revenue: { $sum: "$totalAmount" }
                 }
-            },
-            { $sort: { "_id.year": 1, "_id.month": 1 } }
+            }
         ]);
+
+        // Merge DB data into our 6-month array
+        const graphData = monthsData.map(m => {
+            const found = dbStats.find(s => s._id.month === m.month && s._id.year === m.year);
+            return {
+                month: m.label,
+                appointments: found ? found.appointments : 0,
+                revenue: found ? found.revenue : 0
+            };
+        });
 
         return {
             cards: { totalDoctors, totalPets, totalOwners, totalRevenue },
-            graphData: graphData.map(d => ({
-                month: new Date(d._id.year, d._id.month - 1).toLocaleString('default', { month: 'short' }),
-                appointments: d.appointments,
-                revenue: d.revenue
-            }))
+            graphData
         };
     }
 
     async getReportsData(filters: any): Promise<any> {
         const { from, to, specialtyId, search } = filters;
-        const match: any = { status: AppointmentStatus.COMPLETED };
+        const match: any = { 
+            status: AppointmentStatus.COMPLETED,
+            paymentStatus: 'PAID'
+        };
 
         if (from || to) {
             match.appointmentDate = {};
@@ -68,7 +95,7 @@ export class AdminAnalyticsService implements IAdminAnalyticsService {
                 $group: {
                     _id: "$doctorId",
                     noOfAppointments: { $sum: 1 },
-                    totalEarned: { $sum: "$amount" }
+                    totalEarned: { $sum: "$totalAmount" }
                 }
             },
             {
@@ -151,7 +178,7 @@ export class AdminAnalyticsService implements IAdminAnalyticsService {
                     $group: {
                         _id: null,
                         count: { $sum: 1 },
-                        revenue: { $sum: "$amount" }
+                        revenue: { $sum: "$totalAmount" }
                     }
                 }
             ]);

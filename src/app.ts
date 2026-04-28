@@ -17,6 +17,8 @@ import prescriptionRoutes from './routes/prescription.routes';
 import chatRoutes from './routes/chat.routes';
 import agoraRoutes from './routes/agora.routes';
 import notificationRoutes from './routes/notification.routes';
+import slotRoutes from './routes/slot.routes';
+
 
 
 const app = express();
@@ -51,7 +53,9 @@ app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/agora', agoraRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/slots', slotRoutes);
 app.use('/api', routes);
+
 
 
 

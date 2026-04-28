@@ -9,6 +9,9 @@ import { Appointment } from '../../models/appointment.model';
 import { AppointmentStatus } from '../../enums/appointment-status.enum';
 import { Slot } from '../../models/slot.model';
 import { IWalletTransaction } from '../../models/wallet-transaction.model';
+import { NotificationHelper } from '../../utils/notification-helper';
+import Admin from '../../models/admin.model';
+import { Doctor } from '../../models/doctor.model';
 
 export class PaymentService implements IPaymentService {
     private razorpay: Razorpay;
@@ -28,7 +31,7 @@ export class PaymentService implements IPaymentService {
             if (appointmentId !== 'topup') {
                 const appointment = await Appointment.findById(appointmentId).populate('slotId');
                 if (!appointment) return { success: false, message: 'Appointment not found' };
-                
+
                 const slot = appointment.slotId as any;
                 if (!slot || (slot.isBooked && appointment.status !== AppointmentStatus.PAYMENT_PENDING)) {
                     return { success: false, message: 'This slot is no longer available' };
@@ -41,25 +44,25 @@ export class PaymentService implements IPaymentService {
                 receipt: `receipt_${appointmentId}`,
             };
 
-            logger.info('PaymentService: Attempting to create Razorpay order', { 
-                amount_paise: options.amount, 
-                appointmentId, 
+            logger.info('PaymentService: Attempting to create Razorpay order', {
+                amount_paise: options.amount,
+                appointmentId,
                 userId,
-                keyId: env.razorpayKeyId 
+                keyId: env.razorpayKeyId
             });
-            
+
             let order;
             try {
                 order = await this.razorpay.orders.create(options);
                 logger.info('PaymentService: Razorpay order created successfully', { orderId: order.id });
             } catch (rzpErr: any) {
-                logger.error('PaymentService: Razorpay API call failed', { 
+                logger.error('PaymentService: Razorpay API call failed', {
                     error: rzpErr.message,
                     metadata: rzpErr.error || rzpErr
                 });
                 return { success: false, message: `Razorpay API Error: ${rzpErr.message}` };
             }
-            
+
             // Create or update a pending payment record
             const paymentData: any = {
                 paymentID: order.id,
@@ -79,8 +82,8 @@ export class PaymentService implements IPaymentService {
 
             return { success: true, order };
         } catch (error: any) {
-            logger.error('PaymentService: Unexpected error in createRazorpayOrder', { 
-                message: error.message, 
+            logger.error('PaymentService: Unexpected error in createRazorpayOrder', {
+                message: error.message,
                 stack: error.stack
             });
             return { success: false, message: 'Failed to create payment order' };
@@ -102,22 +105,22 @@ export class PaymentService implements IPaymentService {
             try {
                 // Update internal payment status to success
                 const paymentRecord = await this._paymentRepository.updatePaymentStatus(razorpay_order_id, 'success', razorpay_payment_id, session);
-                
+
                 if (appointmentId === 'topup') {
                     if (paymentRecord) {
                         // Top up the wallet
                         const userId = paymentRecord.ownerID.toString();
                         let wallet = await this._paymentRepository.getWalletByUserId(userId, session);
                         if (!wallet) {
-                            wallet = await this._paymentRepository.createWallet({ 
-                                userId: new mongoose.Types.ObjectId(userId), 
-                                balance: 0, 
-                                holdAmount: 0 
+                            wallet = await this._paymentRepository.createWallet({
+                                userId: new mongoose.Types.ObjectId(userId),
+                                balance: 0,
+                                holdAmount: 0
                             }, session);
                         }
-                        
+
                         await this._paymentRepository.updateWalletBalance(userId, paymentRecord.amount, 'credit', session);
-                        
+
                         // Create wallet transaction
                         await this._paymentRepository.createWalletTransaction({
                             transactionID: `TXN_${Date.now()}_${razorpay_payment_id.slice(-4)}`,
@@ -127,12 +130,15 @@ export class PaymentService implements IPaymentService {
                             source: 'wallet-recharge' as any,
                             message: 'Wallet Top-up via Razorpay',
                         }, session);
-                        
+
                         logger.info('Wallet top-up successful via Razorpay', { userId, amount: paymentRecord.amount });
                     }
                 } else {
                     // Update appointment status to booked and mark as paid
-                    const appointment = await Appointment.findById(appointmentId).session(session);
+                    const appointment = await Appointment.findById(appointmentId)
+                        .populate('petId')
+                        .populate({ path: 'doctorId', populate: { path: 'userId' } })
+                        .session(session);
                     if (!appointment) throw new Error('Appointment not found');
 
                     const slot = await Slot.findById(appointment.slotId).session(session);
@@ -150,7 +156,26 @@ export class PaymentService implements IPaymentService {
                     appointment.paymentMethod = 'razorpay';
                     appointment.transactionID = razorpay_payment_id;
                     await appointment.save({ session });
-                    
+
+                    // Trigger notification after successful payment
+                    try {
+                        const pet = appointment.petId as any;
+                        const doctor = appointment.doctorId as any;
+                        if (pet && doctor) {
+                            await NotificationHelper.notifyAppointmentBooked(
+                                appointment.ownerId.toString(),
+                                doctor._id.toString(),
+                                (doctor.userId as any)?._id?.toString() || doctor.userId.toString(),
+                                pet.name || 'a pet',
+                                new Date(appointment.appointmentDate).toLocaleDateString(),
+                                appointment.appointmentStartTime,
+                                appointment._id.toString()
+                            );
+                        }
+                    } catch (notiErr) {
+                        logger.error('Error sending booking notification after Razorpay success:', notiErr);
+                    }
+
                     logger.info('Appointment payment successful via Razorpay', { appointmentId, paymentId: razorpay_payment_id });
                 }
 
@@ -166,11 +191,11 @@ export class PaymentService implements IPaymentService {
         } else {
             // Update payment status to failed
             await this._paymentRepository.updatePaymentStatus(razorpay_order_id, 'failed');
-            
+
             // Do NOT cancel the appointment or unlock the slot here. 
             // We want to keep it as 'payment pending' for retries.
             logger.info('Payment verification failed, keeping appointment as payment pending for retry', { appointmentId });
-            
+
             return { success: false, message: 'Invalid payment signature' };
         }
     }
@@ -215,7 +240,10 @@ export class PaymentService implements IPaymentService {
             }, session);
 
             // Fetch appointment for transaction details
-            const appointment = await Appointment.findById(appointmentId).session(session);
+            const appointment = await Appointment.findById(appointmentId)
+                .populate('petId')
+                .populate({ path: 'doctorId', populate: { path: 'userId' } })
+                .session(session);
             if (!appointment) throw new Error('Appointment not found');
 
             const slot = await Slot.findById(appointment.slotId).session(session);
@@ -246,6 +274,25 @@ export class PaymentService implements IPaymentService {
             appointment.paymentMethod = 'wallet';
             appointment.transactionID = internalPaymentId;
             await appointment.save({ session });
+
+            // Trigger notification after successful payment
+            try {
+                const pet = appointment.petId as any;
+                const doctor = appointment.doctorId as any;
+                if (pet && doctor) {
+                    await NotificationHelper.notifyAppointmentBooked(
+                        appointment.ownerId.toString(),
+                        doctor._id.toString(),
+                        (doctor.userId as any)?._id?.toString() || doctor.userId.toString(),
+                        pet.name || 'a pet',
+                        new Date(appointment.appointmentDate).toLocaleDateString(),
+                        appointment.appointmentStartTime,
+                        appointment._id.toString()
+                    );
+                }
+            } catch (notiErr) {
+                logger.error('Error sending booking notification after Wallet payment success:', notiErr);
+            }
 
             await session.commitTransaction();
             return { success: true, message: 'Payment successful using wallet' };
@@ -347,7 +394,7 @@ export class PaymentService implements IPaymentService {
             // We need the amount. Assuming we can get it from somewhere or it's standard fees.
             // For now, let's assume we need to pass the amount or fetch from doctor profile.
             // This needs to be robust.
-            
+
             if (method === 'razorpay') {
                 return { success: false, message: 'Retry logic for Razorpay triggered. Fetching details...' };
             }
@@ -430,10 +477,10 @@ export class PaymentService implements IPaymentService {
         try {
             let wallet = await this._paymentRepository.getWalletByUserId(userId, session);
             if (!wallet) {
-                wallet = await this._paymentRepository.createWallet({ 
-                    userId: new mongoose.Types.ObjectId(userId), 
-                    balance: 0, 
-                    holdAmount: 0 
+                wallet = await this._paymentRepository.createWallet({
+                    userId: new mongoose.Types.ObjectId(userId),
+                    balance: 0,
+                    holdAmount: 0
                 }, session);
             }
 
@@ -493,6 +540,20 @@ export class PaymentService implements IPaymentService {
             }, session);
 
             await session.commitTransaction();
+
+            // Notify Admin
+            try {
+                const admins = await Admin.find().select('_id');
+                const doctor = await Doctor.findOne({ userId }).populate('userId');
+                const doctorName = (doctor?.userId as any)?.username || 'Doctor';
+                
+                for (const admin of admins) {
+                    await NotificationHelper.notifyWithdrawalRequested(admin._id.toString(), userId, doctorName, amount);
+                }
+            } catch (err) {
+                logger.error('Error sending withdrawal request notification to admin', err);
+            }
+
             return { success: true, message: 'Withdrawal request submitted for Admin approval' };
         } catch (error: any) {
             await session.abortTransaction();
@@ -508,7 +569,7 @@ export class PaymentService implements IPaymentService {
         session.startTransaction();
         try {
             const transaction = await this._paymentRepository.getTransactionById(transactionId);
-            
+
             if (!transaction) {
                 return { success: false, message: 'Transaction not found' };
             }
@@ -538,6 +599,15 @@ export class PaymentService implements IPaymentService {
             await transaction.save({ session });
 
             await session.commitTransaction();
+
+            // Notify Doctor
+            try {
+                const doctorUserId = wallet.userId?._id?.toString() || wallet.userId?.toString();
+                await NotificationHelper.notifyWithdrawalApproved(doctorUserId, transaction.amount);
+            } catch (err) {
+                logger.error('Error sending withdrawal approval notification to doctor', err);
+            }
+
             return { success: true, message: 'Withdrawal approved successfully' };
         } catch (error: any) {
             await session.abortTransaction();
@@ -553,7 +623,7 @@ export class PaymentService implements IPaymentService {
         session.startTransaction();
         try {
             const transaction = await this._paymentRepository.getTransactionById(transactionId);
-            
+
             if (!transaction) {
                 return { success: false, message: 'Transaction not found' };
             }
@@ -573,6 +643,15 @@ export class PaymentService implements IPaymentService {
             await transaction.save({ session });
 
             await session.commitTransaction();
+
+            // Notify Doctor
+            try {
+                const doctorUserId = wallet.userId?._id?.toString() || wallet.userId?.toString();
+                await NotificationHelper.notifyWithdrawalRejected(doctorUserId, transaction.amount, 'Request rejected by Admin');
+            } catch (err) {
+                logger.error('Error sending withdrawal rejection notification to doctor', err);
+            }
+
             return { success: true, message: 'Withdrawal request rejected' };
         } catch (error: any) {
             await session.abortTransaction();
