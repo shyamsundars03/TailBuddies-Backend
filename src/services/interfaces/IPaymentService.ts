@@ -22,19 +22,19 @@ export interface IPaymentService {
     // Razorpay logic
     createRazorpayOrder(amount: number, appointmentId: string, userId: string): Promise<{ success: boolean; order?: any; message?: string }>;
     verifyRazorpaySignature(verificationData: PaymentVerificationData): Promise<{ success: boolean; message: string }>;
-    
+
     // Wallet logic
     getWallet(userId: string): Promise<{ success: boolean; wallet?: IWallet; message?: string }>;
     processWalletPayment(userId: string, amount: number, appointmentId: string): Promise<{ success: boolean; message: string }>;
     topUpWallet(userId: string, amount: number, transactionId: string): Promise<{ success: boolean; message: string }>;
-    
+
     // Cash balance and general
     processCashPayment(appointmentId: string, userId: string): Promise<{ success: boolean; message: string }>;
     getTransactions(userId: string, page: number, limit: number): Promise<{ success: boolean; transactions?: IWalletTransaction[]; total?: number; message?: string }>;
-    
+
     // Retry logic
     retryPayment(appointmentId: string, method: string): Promise<{ success: boolean; order?: any; message?: string }>;
-    
+
     // Refund logic
     refund(appointmentId: string, reason: string, session?: ClientSession): Promise<{ success: boolean; message: string }>;
 

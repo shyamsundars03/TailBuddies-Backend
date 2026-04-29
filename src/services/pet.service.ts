@@ -3,9 +3,9 @@ import { IPetRepository } from '../repositories/interfaces/IPetRepository';
 import { IPetService } from './interfaces/IPetService';
 
 export class PetService implements IPetService {
-    
-    
-    
+
+
+
     private readonly _petRepository: IPetRepository;
 
     constructor(petRepository: IPetRepository) {
@@ -20,14 +20,14 @@ export class PetService implements IPetService {
                 throw new Error('You already have a pet with this name');
             }
         }
-        
-        
+
+
         if (petData.vaccinations && petData.vaccinations.length > 0) {
             petData.isVaccinated = 'YES';
         } else {
             petData.isVaccinated = 'NO';
         }
-        
+
         return await this._petRepository.createPet({ ...petData, ownerId: ownerId as any });
     }
 
@@ -60,24 +60,24 @@ export class PetService implements IPetService {
             throw new Error('Unauthorized to update this pet');
         }
 
-        
+
         if (updateData.name && updateData.name !== pet.name) {
             const existingPet = await this._petRepository.findByNameAndOwnerId(updateData.name, ownerId);
             if (existingPet) {
                 throw new Error('You already have a pet with this name');
             }
         }
-        
+
         if (updateData.vaccinations) {
-            
+
             updateData.isVaccinated = updateData.vaccinations.length > 0 ? 'YES' : 'NO';
         }
-        
+
         const updatedPet = await this._petRepository.updatePet(id, updateData);
-        
-        
-        
-        
+
+
+
+
         if (!updatedPet) {
             throw new Error('Failed to update pet');
         }
@@ -146,5 +146,8 @@ export class PetService implements IPetService {
 
 
 
-    
+
 }
+
+
+    

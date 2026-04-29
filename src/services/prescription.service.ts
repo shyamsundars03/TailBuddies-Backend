@@ -8,6 +8,9 @@ import { INotificationService } from './notification.service';
 import mongoose from 'mongoose';
 import logger from '../logger';
 
+import { AppError } from '../errors/app-error';
+import { HttpStatus } from '../constants';
+
 export class PrescriptionService implements IPrescriptionService {
     private readonly _prescriptionRepository: IPrescriptionRepository;
     private readonly _appointmentRepository: IAppointmentRepository;
@@ -31,28 +34,28 @@ export class PrescriptionService implements IPrescriptionService {
 
     async createPrescription(data: any): Promise<{ success: boolean; data?: IPrescription; message?: string }> {
         try {
-            
-            const doctor = await this._doctorRepository.findByUserId(data.vetId);
-            if (!doctor) throw new Error('Doctor profile not found for this user');
 
-           
+            const doctor = await this._doctorRepository.findByUserId(data.vetId);
+            if (!doctor) throw new AppError('Doctor profile not found for this user', HttpStatus.NOT_FOUND);
+
+
             let prescription = await this._prescriptionRepository.model.findOne({ appointmentId: data.appointmentId });
 
             if (prescription) {
-               
+
                 Object.assign(prescription, {
                     ...data,
                     vetId: doctor._id
                 });
-                
+
 
                 prescription.markModified('vitals');
                 prescription.markModified('medications');
-                
+
                 await prescription.save();
                 logger.info(`Updated existing prescription ${prescription.prescriptionId} for appointment ${data.appointmentId}`);
             } else {
-                
+
                 const randomDigits = Math.floor(10000 + Math.random() * 90000).toString();
                 const prescriptionId = `PRE${randomDigits}`;
 
@@ -64,13 +67,13 @@ export class PrescriptionService implements IPrescriptionService {
                 logger.info(`Created new prescription ${prescription.prescriptionId} for appointment ${data.appointmentId}`);
             }
 
-            
+
             await (this._appointmentRepository as any).model.findByIdAndUpdate(
                 data.appointmentId,
                 { prescriptionId: prescription._id.toString() }
             );
 
-           
+
             try {
                 const appointment = await this._appointmentRepository.findById(data.appointmentId);
                 if (appointment) {
@@ -86,11 +89,11 @@ export class PrescriptionService implements IPrescriptionService {
                 logger.error('Error creating notification for prescription', { notiError });
             }
 
-            
+
             const { SocketService } = require('./socket.service');
             if (SocketService.io) {
-                SocketService.io.to(`appointment:${data.appointmentId}`).emit('status-updated', { 
-                    prescriptionId: prescription._id 
+                SocketService.io.to(`appointment:${data.appointmentId}`).emit('status-updated', {
+                    prescriptionId: prescription._id
                 });
             }
 
@@ -103,15 +106,15 @@ export class PrescriptionService implements IPrescriptionService {
 
     async getPrescriptionByAppointmentId(appointmentId: string): Promise<{ success: boolean; data?: IPrescription; message?: string }> {
         try {
-            
+
             const appointment = await this._appointmentRepository.findById(appointmentId);
             if (appointment && appointment.prescriptionId) {
-                
+
                 if (typeof appointment.prescriptionId === 'object' && (appointment.prescriptionId as any).prescriptionId) {
                     return { success: true, data: appointment.prescriptionId as any };
                 }
 
-                
+
                 let idToUse = appointment.prescriptionId.toString();
                 if (idToUse.includes('{') || idToUse.includes('ObjectId')) {
                     const idMatch = idToUse.match(/_id:\s*(?:new\s+ObjectId\()?['"]?([a-f\d]{24})['"]?/i);
@@ -120,8 +123,8 @@ export class PrescriptionService implements IPrescriptionService {
                         logger.info(`Extracted ID ${idToUse} from corrupted prescriptionId string`);
                     }
                 }
-                
-                
+
+
                 const prescription = await this._prescriptionRepository.findById(idToUse);
                 if (prescription) {
                     logger.info(`Fetched prescription ${prescription.prescriptionId} via appointment link for ${appointmentId}`);
@@ -129,7 +132,7 @@ export class PrescriptionService implements IPrescriptionService {
                 }
             }
 
-            
+
             const prescription = await this._prescriptionRepository.findByAppointmentId(appointmentId);
             if (!prescription) {
                 return { success: false, message: 'Prescription not found' };
@@ -150,7 +153,7 @@ export class PrescriptionService implements IPrescriptionService {
                     idToUse = idMatch[1];
                 }
             }
-            
+
             const model = (this._prescriptionRepository as any)._model;
             const query: any = {
                 $or: [
@@ -180,15 +183,16 @@ export class PrescriptionService implements IPrescriptionService {
         }
     }
 
-    async generatePrescriptionPdf(prescriptionId: string): Promise<{ success: boolean; data?: Buffer; message?: string }> {
+    async generatePrescriptionPdf(prescriptionId: string): Promise<{ success: boolean; data?: Buffer; filename?: string; message?: string }> {
         try {
             let idToUse = prescriptionId;
-            if (idToUse.includes('{') || idToUse.includes('ObjectId')) {
-                const idMatch = idToUse.match(/_id:\s*(?:new\s+ObjectId\()?['"]?([a-f\d]{24})['"]?/i);
+            if (idToUse && typeof idToUse === 'string' && (idToUse.includes('{') || idToUse.includes('ObjectId'))) {
+                const idMatch = idToUse.match(/([a-f\d]{24})/i);
                 if (idMatch) {
                     idToUse = idMatch[1];
                 }
             }
+
 
             const model = (this._prescriptionRepository as any)._model;
             const query: any = {
@@ -198,18 +202,36 @@ export class PrescriptionService implements IPrescriptionService {
             };
 
             if (mongoose.Types.ObjectId.isValid(idToUse)) {
-                query.$or.push({ _id: new mongoose.Types.ObjectId(idToUse) });
-                query.$or.push({ appointmentId: new mongoose.Types.ObjectId(idToUse) });
-            } else {
-                query.$or.push({ _id: idToUse as any });
-                query.$or.push({ appointmentId: idToUse as any });
+                const oid = new mongoose.Types.ObjectId(idToUse);
+                query.$or.push({ _id: oid });
+                query.$or.push({ appointmentId: oid });
+            }
+            // If it's not a valid ObjectId, we don't add it to _id or appointmentId queries
+            // as it would cause a CastError. It's already in the prescriptionId query.
+
+
+            // STAGE 1: Search Prescription collection directly
+            let prescription = await model.findOne(query);
+
+            // STAGE 2: If not found, try searching by appointmentId directly through the repository
+            if (!prescription && mongoose.Types.ObjectId.isValid(idToUse)) {
+                prescription = await this._prescriptionRepository.findByAppointmentId(idToUse);
             }
 
-            const prescription = await model.findOne(query);
+            // STAGE 3: If STILL not found, try finding an appointment with this ID and use its linked prescriptionId
+            if (!prescription && mongoose.Types.ObjectId.isValid(idToUse)) {
+                const appointment = await (this._appointmentRepository as any).model.findById(idToUse);
+                if (appointment && appointment.prescriptionId) {
+                    prescription = await model.findById(appointment.prescriptionId);
+                }
+            }
 
             if (!prescription) {
-                return { success: false, message: `Record not found for ID: ${idToUse}` };
+                logger.warn(`Prescription download failed: Record not found for ID ${idToUse}`);
+                return { success: false, message: `No prescription record found for the provided ID.` };
             }
+
+
 
             let apptIdToUse = prescription.appointmentId.toString();
             if (apptIdToUse.includes('{') || apptIdToUse.includes('ObjectId')) {
@@ -219,7 +241,7 @@ export class PrescriptionService implements IPrescriptionService {
                 }
             }
 
-            const apptQuery = mongoose.Types.ObjectId.isValid(apptIdToUse) 
+            const apptQuery = mongoose.Types.ObjectId.isValid(apptIdToUse)
                 ? { _id: new mongoose.Types.ObjectId(apptIdToUse) }
                 : { _id: apptIdToUse };
 
@@ -228,13 +250,28 @@ export class PrescriptionService implements IPrescriptionService {
                 const directAppt = await this._appointmentRepository.findById(apptIdToUse);
                 if (directAppt) {
                     const pdfBuffer = await this._pdfService.generatePrescriptionPdf(prescription, directAppt);
-                    return { success: true, data: pdfBuffer };
+                    const apptDate = directAppt.appointmentDate || directAppt.createdAt || new Date();
+                    const dateStr = new Date(apptDate).toLocaleDateString('en-CA'); // YYYY-MM-DD
+                    return {
+                        success: true,
+                        data: pdfBuffer,
+                        filename: `Prescription-${dateStr}.pdf`
+                    };
                 }
+
                 return { success: false, message: 'Appointment not found' };
             }
 
-            const pdfBuffer = await this._pdfService.generatePrescriptionPdf(prescription, appointment[0]);
-            return { success: true, data: pdfBuffer };
+            const appt = appointment[0];
+            const pdfBuffer = await this._pdfService.generatePrescriptionPdf(prescription, appt);
+            const apptDate = appt.appointmentDate || appt.createdAt || new Date();
+            const dateStr = new Date(apptDate).toLocaleDateString('en-CA'); // YYYY-MM-DD
+            return {
+                success: true,
+                data: pdfBuffer,
+                filename: `Prescription-${dateStr}.pdf`
+            };
+
         } catch (error: any) {
             logger.error('Error in PrescriptionService.generatePrescriptionPdf', { error: error.message });
             return { success: false, message: error.message };

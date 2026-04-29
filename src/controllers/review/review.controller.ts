@@ -1,13 +1,12 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../middleware/auth.middleware';
+import { Response, NextFunction } from 'express';
 import { ReviewService } from '../../services/review.service';
 import { HttpStatus } from '../../constants';
-import logger from '../../logger';
+import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 
 export class ReviewController {
     constructor(private reviewService: ReviewService) {}
 
-    create = async (req: AuthRequest, res: Response): Promise<void> => {
+    create = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -21,15 +20,11 @@ export class ReviewController {
                 data: review
             });
         } catch (error: any) {
-            logger.error('Error creating review', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    update = async (req: AuthRequest, res: Response): Promise<void> => {
+    update = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -43,15 +38,11 @@ export class ReviewController {
                 data: review
             });
         } catch (error: any) {
-            logger.error('Error updating review', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    delete = async (req: AuthRequest, res: Response): Promise<void> => {
+    delete = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             const role = req.user?.role;
@@ -65,15 +56,11 @@ export class ReviewController {
                 message: 'Review deleted successfully'
             });
         } catch (error: any) {
-            logger.error('Error deleting review', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    reply = async (req: AuthRequest, res: Response): Promise<void> => {
+    reply = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -87,15 +74,11 @@ export class ReviewController {
                 data: review
             });
         } catch (error: any) {
-            logger.error('Error replying to review', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    updateReply = async (req: AuthRequest, res: Response): Promise<void> => {
+    updateReply = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -109,15 +92,11 @@ export class ReviewController {
                 data: review
             });
         } catch (error: any) {
-            logger.error('Error updating reply', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    deleteReply = async (req: AuthRequest, res: Response): Promise<void> => {
+    deleteReply = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             const role = req.user?.role;
@@ -132,15 +111,11 @@ export class ReviewController {
                 data: review
             });
         } catch (error: any) {
-            logger.error('Error deleting reply', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    getDoctorReviews = async (req: AuthRequest, res: Response): Promise<void> => {
+    getDoctorReviews = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             const page = parseInt(req.query.page as string) || 1;
@@ -160,15 +135,11 @@ export class ReviewController {
                 limit
             });
         } catch (error: any) {
-            logger.error('Error fetching doctor reviews', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    getOwnerReviews = async (req: AuthRequest, res: Response): Promise<void> => {
+    getOwnerReviews = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             const page = parseInt(req.query.page as string) || 1;
@@ -188,15 +159,11 @@ export class ReviewController {
                 limit
             });
         } catch (error: any) {
-            logger.error('Error fetching owner reviews', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    getAllReviews = async (req: AuthRequest, res: Response): Promise<void> => {
+    getAllReviews = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 4;
@@ -211,15 +178,11 @@ export class ReviewController {
                 limit
             });
         } catch (error: any) {
-            logger.error('Error fetching all reviews', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    getById = async (req: AuthRequest, res: Response): Promise<void> => {
+    getById = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const review = await this.reviewService.getReviewById(req.params.id as string);
             if (!review) {
@@ -231,15 +194,11 @@ export class ReviewController {
                 data: review
             });
         } catch (error: any) {
-            logger.error('Error fetching review by ID', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    getByAppointment = async (req: AuthRequest, res: Response): Promise<void> => {
+    getByAppointment = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const review = await this.reviewService.getReviewByAppointment(req.params.appointmentId as string);
             res.status(HttpStatus.OK).json({
@@ -247,15 +206,11 @@ export class ReviewController {
                 data: review
             });
         } catch (error: any) {
-            logger.error('Error fetching review by appointment', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    getByDoctorId = async (req: AuthRequest, res: Response): Promise<void> => {
+    getByDoctorId = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const doctorId = req.params.doctorId as string;
             const page = parseInt(req.query.page as string) || 1;
@@ -271,21 +226,16 @@ export class ReviewController {
                 limit
             });
         } catch (error: any) {
-            logger.error('Error fetching reviews by doctor ID', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message
-            });
+            next(error);
         }
     };
 
-    recalculateRatings = async (req: AuthRequest, res: Response): Promise<void> => {
+    recalculateRatings = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const result = await this.reviewService.recalculateAllDoctorRatings();
             res.status(HttpStatus.OK).json(result);
         } catch (error: any) {
-            logger.error('Error in recalculateRatings controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 }

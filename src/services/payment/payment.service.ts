@@ -546,7 +546,7 @@ export class PaymentService implements IPaymentService {
                 const admins = await Admin.find().select('_id');
                 const doctor = await Doctor.findOne({ userId }).populate('userId');
                 const doctorName = (doctor?.userId as any)?.username || 'Doctor';
-                
+
                 for (const admin of admins) {
                     await NotificationHelper.notifyWithdrawalRequested(admin._id.toString(), userId, doctorName, amount);
                 }

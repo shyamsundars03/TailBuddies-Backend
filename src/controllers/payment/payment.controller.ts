@@ -1,8 +1,8 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../middleware/auth.middleware';
+import { Response, NextFunction } from 'express';
 import { IPaymentService } from '../../services/interfaces/IPaymentService';
 import { HttpStatus } from '../../constants';
 import logger from '../../logger';
+import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 
 export class PaymentController {
     private readonly _paymentService: IPaymentService;
@@ -11,7 +11,7 @@ export class PaymentController {
         this._paymentService = paymentService;
     }
 
-    createOrder = async (req: AuthRequest, res: Response): Promise<void> => {
+    createOrder = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -20,32 +20,22 @@ export class PaymentController {
             }
             const { amount, appointmentId } = req.body;
             const result = await this._paymentService.createRazorpayOrder(amount, appointmentId, userId);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in createOrder controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    verifyPayment = async (req: AuthRequest, res: Response): Promise<void> => {
+    verifyPayment = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const result = await this._paymentService.verifyRazorpaySignature(req.body);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in verifyPayment controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    getWallet = async (req: AuthRequest, res: Response): Promise<void> => {
+    getWallet = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -53,18 +43,13 @@ export class PaymentController {
                 return;
             }
             const result = await this._paymentService.getWallet(userId);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in getWallet controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    payWithWallet = async (req: AuthRequest, res: Response): Promise<void> => {
+    payWithWallet = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -73,18 +58,13 @@ export class PaymentController {
             }
             const { amount, appointmentId } = req.body;
             const result = await this._paymentService.processWalletPayment(userId, amount, appointmentId);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in payWithWallet controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    getTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
+    getTransactions = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -94,33 +74,23 @@ export class PaymentController {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
             const result = await this._paymentService.getTransactions(userId, page, limit);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in getTransactions controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    retryPayment = async (req: AuthRequest, res: Response): Promise<void> => {
+    retryPayment = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { appointmentId, method } = req.body;
             const result = await this._paymentService.retryPayment(appointmentId, method);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in retryPayment controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    getAllTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
+    getAllTransactions = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
@@ -128,33 +98,23 @@ export class PaymentController {
             const status = req.query.status as string;
 
             const result = await this._paymentService.getAllTransactions(page, limit, search, status);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in getAllTransactions controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    getTransactionDetail = async (req: AuthRequest, res: Response): Promise<void> => {
+    getTransactionDetail = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const id = req.params.id as string;
             const result = await this._paymentService.getTransactionDetail(id);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in getTransactionDetail controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    requestWithdrawal = async (req: AuthRequest, res: Response): Promise<void> => {
+    requestWithdrawal = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -163,44 +123,29 @@ export class PaymentController {
             }
             const { amount } = req.body;
             const result = await this._paymentService.requestWithdrawal(userId, amount);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in requestWithdrawal controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    approveWithdrawal = async (req: AuthRequest, res: Response): Promise<void> => {
+    approveWithdrawal = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const id = String(req.params.id);
             const result = await this._paymentService.approveWithdrawal(id);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in approveWithdrawal controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    rejectWithdrawal = async (req: AuthRequest, res: Response): Promise<void> => {
+    rejectWithdrawal = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const id = String(req.params.id);
             const result = await this._paymentService.rejectWithdrawal(id);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error in rejectWithdrawal controller', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 }

@@ -1,17 +1,13 @@
-import { Request, Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { IAdminService } from '../../services/interfaces/IAdminService';
 import { IDoctorService } from '../../services/interfaces/IDoctorService';
 import { HttpStatus, SuccessMessages, ErrorMessages } from '../../constants';
 import logger from '../../logger';
 import { verifyDoctorSchema } from '../../utils/doctor.validator';
 import { env } from '../../config/env';
-
-
-
-
+import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 
 export class AdminController {
-
 
     private readonly _adminService: IAdminService;
     private readonly _doctorService: IDoctorService;
@@ -24,18 +20,8 @@ export class AdminController {
         this._doctorService = doctorService;
     }
 
-
-
-
-
-
-
-    adminLogin = async (req: Request, res: Response): Promise<void> => {
+    adminLogin = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-
-
-
-
             const { email, password } = req.body;
             if (!email || !password) {
                 res.status(HttpStatus.BAD_REQUEST).json({
@@ -45,12 +31,7 @@ export class AdminController {
                 return;
             }
 
-
-
             const result = await this._adminService.adminLogin({ email, password });
-
-console.log("afaf",result)
-// logger.info(result)
 
             res.cookie('refreshToken', result.refreshToken, {
                 httpOnly: true,
@@ -58,9 +39,6 @@ console.log("afaf",result)
                 sameSite: 'strict',
                 maxAge: env.jwtRefreshMaxAge,
             });
-
-
-
 
             res.status(HttpStatus.OK).json({
                 success: true,
@@ -75,141 +53,76 @@ console.log("afaf",result)
                     accessToken: result.accessToken,
                 },
             });
-
-
-
-
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : ErrorMessages.ADMIN_INVALID_CREDENTIALS;
-            res.status(HttpStatus.UNAUTHORIZED).json({
-                success: false,
-                message,
-            });
+            next(error);
         }
     };
 
-
-
-
-
-    createSpecialty = async (req: Request, res: Response): Promise<void> => {
+    createSpecialty = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const specialty = await this._adminService.createSpecialty(req.body);
             res.status(HttpStatus.CREATED).json({ success: true, data: specialty });
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Unknown error occurred';
-            res.status(HttpStatus.BAD_REQUEST).json({ success: false, message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-    getSpecialties = async (req: Request, res: Response): Promise<void> => {
+    getSpecialties = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-
-
             const page = parseInt(String(req.query.page || '1'));
             const limit = parseInt(String(req.query.limit || '10'));
             const search = req.query.search ? String(req.query.search) : undefined;
             const result = await this._adminService.getSpecialties(page, limit, search);
             res.status(HttpStatus.OK).json({ success: true, data: result });
-
-
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Unknown error occurred';
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message });
+            next(error);
         }
     };
 
-
-
-
-
-
-    updateSpecialty = async (req: Request, res: Response): Promise<void> => {
+    updateSpecialty = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-
             const id = String(req.params.id);
             const specialty = await this._adminService.updateSpecialty(id, req.body);
             res.status(HttpStatus.OK).json({ success: true, data: specialty });
-
-
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Unknown error occurred';
-            res.status(HttpStatus.BAD_REQUEST).json({ success: false, message });
+            next(error);
         }
     };
 
-
-
-    deleteSpecialty = async (req: Request, res: Response): Promise<void> => {
+    deleteSpecialty = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const id = String(req.params.id);
             await this._adminService.deleteSpecialty(id);
             res.status(HttpStatus.OK).json({ success: true, message: 'Specialty deleted' });
-
-
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Unknown error occurred';
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message });
+            next(error);
         }
     };
 
-
-
-
-
-// User Management
-    getUsers = async (req: Request, res: Response): Promise<void> => {
+    getUsers = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-
-
-
             const page = parseInt(String(req.query.page || '1'));
             const limit = parseInt(String(req.query.limit || '10'));
             const role = req.query.role ? String(req.query.role) : undefined;
             const search = req.query.search ? String(req.query.search) : undefined;
             const result = await this._adminService.getUsersWithDetails(page, limit, role, search);
             res.status(HttpStatus.OK).json({ success: true, data: result });
-
-
-
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Unknown error occurred';
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message });
+            next(error);
         }
     };
 
-
-
-
-    toggleUserBlock = async (req: Request, res: Response): Promise<void> => {
+    toggleUserBlock = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-
             const id = String(req.params.id);
             const user = await this._adminService.toggleUserBlock(id);
             res.status(HttpStatus.OK).json({ success: true, data: user });
-
-
-            
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Unknown error occurred';
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-    // Doctor Management
-    getDoctors = async (req: Request, res: Response) => {
+    getDoctors = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
             const page = parseInt(String(req.query.page)) || 1;
             const limit = parseInt(String(req.query.limit)) || 10;
@@ -227,56 +140,24 @@ console.log("afaf",result)
                 limit,
             });
         } catch (error: any) {
-            logger.error('Error fetching all doctors (Admin)', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-    getDoctorById = async (req: Request, res: Response) => {
+    getDoctorById = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
             const { id } = req.params;
             const profile: any = await this._doctorService.getDoctorById(String(id));
-            
-            // console.log(`[AdminController] getDoctorById(${id}) result:`, {
-            //     id: profile?._id,
-            //     hasUserId: !!profile?.userId,
-            //     userIdIsObject: typeof profile?.userId === 'object',
-            //     username: profile?.userId?.username,
-            //     specialtyId: profile?.profile?.specialtyId,
-            //     specialtyName: profile?.profile?.specialtyId?.name
-            // });
-
             res.status(HttpStatus.OK).json({ success: true, data: profile });
         } catch (error: any) {
-            logger.error('Error fetching doctor by id (Admin)', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-    verifyDoctor = async (req: Request, res: Response) => {
+    verifyDoctor = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
             const { id } = req.params;
             
-
             const validationResult = verifyDoctorSchema.safeParse(req.body);
             if (!validationResult.success) {
                 res.status(HttpStatus.BAD_REQUEST).json({
@@ -294,15 +175,7 @@ console.log("afaf",result)
                 data: updatedDoctor,
             });
         } catch (error: any) {
-            logger.error('Error verifying doctor (Admin)', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
-
-
-
-
-
-
-
 }

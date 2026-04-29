@@ -79,10 +79,10 @@ export class SocketService {
                     const now = new Date();
                     const [startH, startM] = appointment.appointmentStartTime.split(':').map(Number);
                     const [endH, endM] = appointment.appointmentEndTime.split(':').map(Number);
-                    
+
                     const apptStart = new Date(appointment.appointmentDate);
                     apptStart.setHours(startH, startM, 0, 0);
-                    
+
                     const apptEnd = new Date(appointment.appointmentDate);
                     apptEnd.setHours(endH, endM, 0, 0);
 
@@ -91,7 +91,7 @@ export class SocketService {
                         return;
                     }
 
-                    
+
                     try {
                         await ChatMessage.create({
                             appointmentId: appointment._id,
@@ -103,7 +103,7 @@ export class SocketService {
                         logger.info(`Message persisted for appointment ${appointmentId}`);
                     } catch (dbError) {
                         logger.error('Failed to persist chat message:', dbError);
-                        
+
                     }
 
                     this._io.to(`appointment:${appointmentId}`).emit('receive-message', {

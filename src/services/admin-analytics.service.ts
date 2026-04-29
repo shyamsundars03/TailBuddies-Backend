@@ -7,86 +7,131 @@ import { Specialty } from '../models/specialty.model';
 import { AppointmentStatus } from '../enums/appointment-status.enum';
 
 export interface IAdminAnalyticsService {
-    getDashboardStats(): Promise<any>;
+    getDashboardStats(filters?: { from?: string; to?: string; grouping?: string }): Promise<any>;
     getReportsData(filters: { from?: string; to?: string; specialtyId?: string; search?: string }): Promise<any>;
     getSpecialtyStats(filters: { from?: string; to?: string }): Promise<any>;
 }
 
 export class AdminAnalyticsService implements IAdminAnalyticsService {
-    async getDashboardStats(): Promise<any> {
-        const [totalDoctors, totalPets, totalOwners, revenueResult] = await Promise.all([
-            Doctor.countDocuments(),
-            Pet.countDocuments(),
-            User.countDocuments({ role: 'owner' }),
-            Appointment.aggregate([
-                { $match: { status: AppointmentStatus.COMPLETED, paymentStatus: 'PAID' } },
-                { $group: { _id: null, total: { $sum: "$totalAmount" } } }
-            ])
-        ]);
+    async getDashboardStats(filters: { from?: string; to?: string; grouping?: string } = {}): Promise<any> {
+        try {
+            const { from, to, grouping = 'month' } = filters;
 
-        const totalRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
-
-        // Get data for the last 6 months
-        const monthsData = [];
-        const now = new Date();
-        
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            monthsData.push({
-                month: d.getMonth() + 1,
-                year: d.getFullYear(),
-                label: d.toLocaleString('default', { month: 'short' }),
-                appointments: 0,
-                revenue: 0
-            });
-        }
-
-        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-
-        const dbStats = await Appointment.aggregate([
-            { 
-                $match: { 
-                    createdAt: { $gte: sixMonthsAgo }, 
-                    status: AppointmentStatus.COMPLETED, 
-                    paymentStatus: 'PAID' 
-                } 
-            },
-            {
-                $group: {
-                    _id: { month: { $month: "$createdAt" }, year: { $year: "$createdAt" } },
-                    appointments: { $sum: 1 },
-                    revenue: { $sum: "$totalAmount" }
+            // Base match for date range
+            const dateMatch: any = {};
+            if (from || to) {
+                dateMatch.appointmentDate = {};
+                if (from && from.trim() !== "") {
+                    const fromDate = new Date(from);
+                    if (!isNaN(fromDate.getTime())) dateMatch.appointmentDate.$gte = fromDate;
                 }
+                if (to && to.trim() !== "") {
+                    const toDate = new Date(to);
+                    if (!isNaN(toDate.getTime())) dateMatch.appointmentDate.$lte = toDate;
+                }
+                // If the object is empty after checks, remove it
+                if (Object.keys(dateMatch.appointmentDate).length === 0) delete dateMatch.appointmentDate;
             }
-        ]);
 
-        // Merge DB data into our 6-month array
-        const graphData = monthsData.map(m => {
-            const found = dbStats.find(s => s._id.month === m.month && s._id.year === m.year);
-            return {
-                month: m.label,
-                appointments: found ? found.appointments : 0,
-                revenue: found ? found.revenue : 0
+            const [totalDoctors, totalPets, totalOwners, totalRevenueResult] = await Promise.all([
+                Doctor.countDocuments(),
+                Pet.countDocuments(),
+                User.countDocuments({ role: 'owner' }),
+                Appointment.aggregate([
+                    { $match: { status: AppointmentStatus.COMPLETED, paymentStatus: 'PAID', ...dateMatch } },
+                    { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+                ])
+            ]);
+
+            const totalRevenue = totalRevenueResult.length > 0 ? totalRevenueResult[0].total : 0;
+
+            // Define grouping logic for graph
+            let idConfig: any = {};
+            let labelFormat: string = '';
+
+            switch (grouping) {
+                case 'day':
+                    idConfig = {
+                        year: { $year: "$appointmentDate" },
+                        month: { $month: "$appointmentDate" },
+                        day: { $dayOfMonth: "$appointmentDate" }
+                    };
+                    labelFormat = '%d %b';
+                    break;
+                case 'year':
+                    idConfig = { year: { $year: "$appointmentDate" } };
+                    labelFormat = '%Y';
+                    break;
+                case 'month':
+                default:
+                    idConfig = {
+                        year: { $year: "$appointmentDate" },
+                        month: { $month: "$appointmentDate" }
+                    };
+                    labelFormat = '%b %Y';
+                    break;
+            }
+
+            const stats = await Appointment.aggregate([
+                {
+                    $match: {
+                        status: { $ne: 'cancelled' },
+                        ...dateMatch
+                    }
+                },
+                {
+                    $group: {
+                        _id: idConfig,
+                        revenue: { $sum: "$totalAmount" },
+                        appointments: { $sum: 1 },
+                        date: { $first: "$appointmentDate" }
+                    }
+                },
+                { $sort: { "date": 1 } },
+                {
+                    $project: {
+                        _id: 0,
+                        label: { $dateToString: { format: labelFormat, date: "$date" } },
+                        revenue: 1,
+                        appointments: 1
+                    }
+                }
+            ]);
+
+            const graphData = {
+                labels: stats.map(s => s.label),
+                revenue: stats.map(s => s.revenue),
+                appointments: stats.map(s => s.appointments)
             };
-        });
 
-        return {
-            cards: { totalDoctors, totalPets, totalOwners, totalRevenue },
-            graphData
-        };
+            return {
+                cards: { totalDoctors, totalPets, totalOwners, totalRevenue },
+                graphData
+            };
+        } catch (error: any) {
+            console.error('Error in AdminAnalyticsService.getDashboardStats:', error);
+            throw error;
+        }
     }
 
     async getReportsData(filters: any): Promise<any> {
         const { from, to, specialtyId, search } = filters;
-        const match: any = { 
+        const match: any = {
             status: AppointmentStatus.COMPLETED,
             paymentStatus: 'PAID'
         };
 
         if (from || to) {
             match.appointmentDate = {};
-            if (from) match.appointmentDate.$gte = new Date(from);
-            if (to) match.appointmentDate.$lte = new Date(to);
+            if (from && from.trim() !== "") {
+                const fromDate = new Date(from);
+                if (!isNaN(fromDate.getTime())) match.appointmentDate.$gte = fromDate;
+            }
+            if (to && to.trim() !== "") {
+                const toDate = new Date(to);
+                if (!isNaN(toDate.getTime())) match.appointmentDate.$lte = toDate;
+            }
+            if (Object.keys(match.appointmentDate).length === 0) delete match.appointmentDate;
         }
 
         const aggregation: any[] = [
@@ -127,7 +172,7 @@ export class AdminAnalyticsService implements IAdminAnalyticsService {
             { $unwind: { path: "$specialty", preserveNullAndEmptyArrays: true } }
         ];
 
-        if (specialtyId) {
+        if (specialtyId && mongoose.Types.ObjectId.isValid(specialtyId)) {
             aggregation.push({ $match: { "doctor.profile.specialtyId": new mongoose.Types.ObjectId(specialtyId) } });
         }
 
@@ -162,8 +207,15 @@ export class AdminAnalyticsService implements IAdminAnalyticsService {
 
         if (from || to) {
             match.appointmentDate = {};
-            if (from) match.appointmentDate.$gte = new Date(from);
-            if (to) match.appointmentDate.$lte = new Date(to);
+            if (from && from.trim() !== "") {
+                const fromDate = new Date(from);
+                if (!isNaN(fromDate.getTime())) match.appointmentDate.$gte = fromDate;
+            }
+            if (to && to.trim() !== "") {
+                const toDate = new Date(to);
+                if (!isNaN(toDate.getTime())) match.appointmentDate.$lte = toDate;
+            }
+            if (Object.keys(match.appointmentDate).length === 0) delete match.appointmentDate;
         }
 
         // Get all specialties

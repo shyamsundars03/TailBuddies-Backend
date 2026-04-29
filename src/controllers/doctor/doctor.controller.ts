@@ -1,12 +1,10 @@
-import { Request, Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { IDoctorService } from '../../services/interfaces/IDoctorService';
 import { HttpStatus } from '../../constants';
 import logger from '../../logger';
+import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 
 export class DoctorController {
-
-
-
 
     private readonly _doctorService: IDoctorService;
 
@@ -14,15 +12,12 @@ export class DoctorController {
         this._doctorService = doctorService;
     }
 
-
-
-
-
-
-
-    getProfile = async (req: Request, res: Response) => {
+    getProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
-            const userId = (req as any).user.userId;
+            const userId = req.user?.userId;
+            if (!userId) {
+                return res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+            }
             const profile = await this._doctorService.getDoctorProfile(userId);
 
             res.status(HttpStatus.OK).json({
@@ -30,61 +25,30 @@ export class DoctorController {
                 data: profile,
             });
         } catch (error: any) {
-            logger.error('Error fetching doctor profile', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message || 'Internal server error',
-            });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-    getById = async (req: Request, res: Response) => {
+    getById = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
             const { id } = req.params;
             const profile: any = await this._doctorService.getDoctorById(String(id));
-
-            // console.log(`[DoctorController] Fetched doctor ${id} for Admin. Population check:`, {
-            //     hasUserId: !!profile?.userId,
-            //     userIdType: typeof profile?.userId,
-            //     hasSpecialtyId: !!profile?.profile?.specialtyId,
-            //     specialtyIdType: typeof profile?.profile?.specialtyId,
-            //     specialtyName: profile?.profile?.specialtyId?.name
-            // });
 
             res.status(HttpStatus.OK).json({
                 success: true,
                 data: profile,
             });
         } catch (error: any) {
-            logger.error('Error fetching doctor by id', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message || 'Internal server error',
-            });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-    updateProfile = async (req: Request, res: Response) => {
+    updateProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
-            const userId = (req as any).user.userId;
+            const userId = req.user?.userId;
+            if (!userId) {
+                return res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+            }
             const updatedProfile = await this._doctorService.updateDoctorProfile(userId, req.body);
 
             res.status(HttpStatus.OK).json({
@@ -93,26 +57,11 @@ export class DoctorController {
                 data: updatedProfile,
             });
         } catch (error: any) {
-            logger.error('Error updating doctor profile', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message || 'Internal server error',
-            });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-    verifyDoctor = async (req: Request, res: Response) => {
+    verifyDoctor = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
             const { id } = req.params;
             const { isVerified } = req.body;
@@ -126,34 +75,18 @@ export class DoctorController {
             });
             logger.info(`[DoctorController] Doctor with id: ${id} ${isVerified ? 'verified' : 'rejected'} successfully.`);
         } catch (error: any) {
-            logger.error('Error verifying doctor', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message || 'Internal server error',
-            });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-
-    getAllDoctors = async (req: Request, res: Response) => {
+    getAllDoctors = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
             const page = parseInt(String(req.query.page)) || 1;
             const search = typeof req.query.search === 'string' ? req.query.search : undefined;
             const status = typeof req.query.status === 'string' ? req.query.status : undefined;
             const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : undefined;
 
-            const isAdmin = (req as any).user?.role === 'admin';
+            const isAdmin = req.user?.role === 'admin';
             const limit = parseInt(String(req.query.limit)) || (isAdmin ? 10 : 9);
 
             let isVerified = req.query.isVerified !== undefined ? String(req.query.isVerified) === 'true' : undefined;
@@ -180,33 +113,16 @@ export class DoctorController {
                 limit,
             });
         } catch (error: any) {
-            logger.error('Error fetching all doctors', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message || 'Internal server error',
-            });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    requestVerification = async (req: Request, res: Response) => {
+    requestVerification = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
-            const userId = (req as any).user.userId;
-            // console.log(`[DoctorController] Received verification request for user: ${userId}`);
+            const userId = req.user?.userId;
+            if (!userId) {
+                return res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+            }
             logger.info(`[DoctorController] Attempting to request verification for doctor with userId: ${userId}`);
             const updatedDoctor = await this._doctorService.requestVerification(userId);
 
@@ -216,56 +132,19 @@ export class DoctorController {
                 data: updatedDoctor,
             });
         } catch (error: any) {
-            logger.error('Error requesting verification', { error: error.message });
-            res.status(error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message || 'Internal server error',
-            });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    getSpecialties = async (req: Request, res: Response) => {
+    getSpecialties = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
-            // console.log(`[DoctorController] Fetching specialties for user: ${(req as any).user?.userId}`);
             const specialties = await this._doctorService.getSpecialties();
-            // console.log(`[DoctorController] Found ${specialties.length} specialties`);
             res.status(HttpStatus.OK).json({
                 success: true,
                 data: specialties,
             });
         } catch (error: any) {
-            logger.error('Error fetching specialties for doctor', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message || 'Internal server error',
-            });
+            next(error);
         }
     };
-
-
-
-
-
-
-
-
-
-
-
-
-
 }

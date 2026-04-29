@@ -1,14 +1,11 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../middleware/auth.middleware';
+import { Response, NextFunction } from 'express';
 import { IAppointmentService } from '../../services/interfaces/IAppointmentService';
 import { AppointmentStatus } from '../../enums/appointment-status.enum';
 import { HttpStatus } from '../../constants';
 import logger from '../../logger';
+import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 
 export class AppointmentController {
-
-
-
 
     private readonly _appointmentService: IAppointmentService;
 
@@ -16,13 +13,7 @@ export class AppointmentController {
         this._appointmentService = appointmentService;
     }
 
-
-
-
-
-
-
-    create = async (req: AuthRequest, res: Response): Promise<void> => {
+    create = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -34,27 +25,13 @@ export class AppointmentController {
                 mode: req.body?.mode === 'online' ? 'online' : 'offline',
                 ownerId: userId
             });
-            if (result.success) {
-                res.status(HttpStatus.CREATED).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.CREATED : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error creating appointment', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-    getOwnerAppointments = async (req: AuthRequest, res: Response): Promise<void> => {
+    getOwnerAppointments = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -67,29 +44,13 @@ export class AppointmentController {
             const status = req.query.status as string;
             const timeframe = req.query.timeframe as string;
             const result = await this._appointmentService.getAppointmentsByOwner(userId, page, limit, search, status, timeframe);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error fetching owner appointments', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-    getDoctorAppointments = async (req: AuthRequest, res: Response): Promise<void> => {
+    getDoctorAppointments = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -108,18 +69,13 @@ export class AppointmentController {
                 limit,
                 search
             );
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error fetching doctor appointments', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    getStats = async (req: AuthRequest, res: Response): Promise<void> => {
+    getStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -127,18 +83,13 @@ export class AppointmentController {
                 return;
             }
             const result = await this._appointmentService.getDoctorStats(userId);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error fetching doctor stats', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    getOwnerStats = async (req: AuthRequest, res: Response): Promise<void> => {
+    getOwnerStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -146,50 +97,23 @@ export class AppointmentController {
                 return;
             }
             const result = await this._appointmentService.getOwnerStats(userId);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error fetching owner stats', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    cancelPendingAppointment = async (req: AuthRequest, res: Response): Promise<void> => {
+    cancelPendingAppointment = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { id } = req.params;
             const result = await this._appointmentService.cancelPendingAppointment(id as string);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error cancelling pending appointment', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    updateStatus = async (req: AuthRequest, res: Response): Promise<void> => {
-
+    updateStatus = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -210,30 +134,13 @@ export class AppointmentController {
                 );
             }
 
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error updating appointment status', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-
-    getAll = async (req: AuthRequest, res: Response): Promise<void> => {
+    getAll = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
@@ -241,29 +148,13 @@ export class AppointmentController {
             const status = req.query.status as string;
 
             const result = await this._appointmentService.getAllAppointments(page, limit, search, status);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error fetching all appointments', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-    cancel = async (req: AuthRequest, res: Response): Promise<void> => {
+    cancel = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -273,133 +164,58 @@ export class AppointmentController {
             const id = req.params.id as string;
             const { reason } = req.body;
             const result = await this._appointmentService.cancelAppointment(id, userId, reason);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error cancelling appointment', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-    getAvailableSlots = async (req: AuthRequest, res: Response): Promise<void> => {
-        logger.info('AppointmentController.getAvailableSlots hit', { query: req.query });
+    getAvailableSlots = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { doctorId, date } = req.query;
             const result = await this._appointmentService.getAvailableSlots(
                 doctorId as string,
                 new Date(date as string)
             );
-
-
-            // console.log("backend:", result)
-
-            logger.info(`backend:`, result)
-
-
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error fetching available slots', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-    getById = async (req: AuthRequest, res: Response): Promise<void> => {
-        logger.info('AppointmentController.getById hit', { id: req.params.id });
+    getById = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const id = req.params.id as string;
             const result = await this._appointmentService.getAppointmentById(id);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.NOT_FOUND).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.NOT_FOUND).json(result);
         } catch (error: any) {
-            logger.error('Error fetching appointment by ID', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-    checkIn = async (req: AuthRequest, res: Response): Promise<void> => {
+    checkIn = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const id = req.params.id as string;
             const role = req.body.role as 'owner' | 'doctor';
             const result = await this._appointmentService.checkIn(id, role);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error during check-in', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-    checkOut = async (req: AuthRequest, res: Response): Promise<void> => {
-        logger.info('AppointmentController.checkOut hit', { id: req.params.id, body: req.body });
+    checkOut = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const id = req.params.id as string;
             const role = req.body.role as 'owner' | 'doctor';
             const result = await this._appointmentService.checkOut(id, role);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error during check-out', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
-    getPatientsByDoctor = async (req: AuthRequest, res: Response): Promise<void> => {
+
+    getPatientsByDoctor = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -413,33 +229,23 @@ export class AppointmentController {
             const date = req.query.date as string;
 
             const result = await this._appointmentService.getPatientsByDoctor(userId, page, limit, search, species, date);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error fetching doctor patients', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    checkSlotAvailability = async (req: AuthRequest, res: Response): Promise<void> => {
+    checkSlotAvailability = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { id } = req.params;
             const result = await this._appointmentService.checkSlotAvailability(id as string);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error checking slot availability', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    getDoctorSlots = async (req: AuthRequest, res: Response): Promise<void> => {
+    getDoctorSlots = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -448,14 +254,9 @@ export class AppointmentController {
             }
             const { date } = req.query;
             const result = await this._appointmentService.getAllSlotsForDoctor(userId, date as string);
-            if (result.success) {
-                res.status(HttpStatus.OK).json(result);
-                return;
-            }
-            res.status(HttpStatus.BAD_REQUEST).json(result);
+            res.status(result.success ? HttpStatus.OK : HttpStatus.BAD_REQUEST).json(result);
         } catch (error: any) {
-            logger.error('Error fetching doctor slots', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 }

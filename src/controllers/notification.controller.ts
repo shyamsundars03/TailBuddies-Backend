@@ -1,8 +1,7 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
+import { Response, NextFunction } from 'express';
 import { INotificationService } from '../services/notification.service';
 import { HttpStatus } from '../constants';
-import logger from '../logger';
+import { AuthenticatedRequest } from '../interfaces/express-request.interface';
 
 export class NotificationController {
     private readonly _notificationService: INotificationService;
@@ -11,7 +10,7 @@ export class NotificationController {
         this._notificationService = notificationService;
     }
 
-    getUserNotifications = async (req: AuthRequest, res: Response): Promise<void> => {
+    getUserNotifications = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -24,23 +23,21 @@ export class NotificationController {
             
             res.status(HttpStatus.OK).json({ success: true, notifications });
         } catch (error: any) {
-            logger.error('Error fetching notifications', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    markAsRead = async (req: AuthRequest, res: Response): Promise<void> => {
+    markAsRead = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { id } = req.params;
             const success = await this._notificationService.markAsRead(String(id));
             res.status(HttpStatus.OK).json({ success });
         } catch (error: any) {
-            logger.error('Error marking notification as read', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-    markAllRead = async (req: AuthRequest, res: Response): Promise<void> => {
+    markAllRead = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -51,8 +48,7 @@ export class NotificationController {
             await this._notificationService.markAllAsRead(userId);
             res.status(HttpStatus.OK).json({ success: true });
         } catch (error: any) {
-            logger.error('Error marking all notifications as read', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+            next(error);
         }
     };
 }

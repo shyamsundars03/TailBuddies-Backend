@@ -1,10 +1,10 @@
-import { Request, Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { ChatMessage } from '../models/chat-message.model';
 import { HttpStatus } from '../constants';
-import logger from '../logger';
+import { AuthenticatedRequest } from '../interfaces/express-request.interface';
 
 export class ChatController {
-    getChatHistory = async (req: Request, res: Response) => {
+    getChatHistory = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
             const { appointmentId } = req.params;
             
@@ -24,11 +24,7 @@ export class ChatController {
                 data: messages
             });
         } catch (error: any) {
-            logger.error('Error fetching chat history:', error);
-            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: 'Failed to fetch chat history'
-            });
+            next(error);
         }
     };
 }

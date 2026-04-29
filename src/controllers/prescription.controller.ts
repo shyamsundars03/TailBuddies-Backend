@@ -1,5 +1,7 @@
-import { Request, Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { IPrescriptionService } from '../services/interfaces/IPrescriptionService';
+import { AuthenticatedRequest } from '../interfaces/express-request.interface';
+import { HttpStatus } from '../constants';
 
 export class PrescriptionController {
     private readonly _prescriptionService: IPrescriptionService;
@@ -8,45 +10,58 @@ export class PrescriptionController {
         this._prescriptionService = prescriptionService;
     }
 
-    createPrescription = async (req: Request, res: Response) => {
-        const result = await this._prescriptionService.createPrescription({
-            ...req.body,
-            vetId: (req as any).user.userId 
-        });
-        if (result.success) {
-            return res.status(201).json(result);
+    createPrescription = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+        try {
+            const vetId = req.user?.userId;
+            if (!vetId) {
+                return res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+            }
+            const result = await this._prescriptionService.createPrescription({
+                ...req.body,
+                vetId
+            });
+            return res.status(result.success ? HttpStatus.CREATED : HttpStatus.BAD_REQUEST).json(result);
+        } catch (error) {
+            next(error);
         }
-        return res.status(400).json(result);
     };
 
-    getPrescriptionByAppointmentId = async (req: Request, res: Response) => {
-        const appointmentId = req.params.appointmentId as string;
-        const result = await this._prescriptionService.getPrescriptionByAppointmentId(appointmentId);
-        if (result.success) {
-            return res.status(200).json(result);
+    getPrescriptionByAppointmentId = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+        try {
+            const appointmentId = req.params.appointmentId as string;
+            const result = await this._prescriptionService.getPrescriptionByAppointmentId(appointmentId);
+            return res.status(result.success ? HttpStatus.OK : HttpStatus.NOT_FOUND).json(result);
+        } catch (error) {
+            next(error);
         }
-        return res.status(404).json(result);
     };
 
-    getPrescriptionById = async (req: Request, res: Response) => {
-        const id = req.params.id as string;
-        const result = await this._prescriptionService.getPrescriptionById(id);
-        if (result.success) {
-            return res.status(200).json(result);
+    getPrescriptionById = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+        try {
+            const id = req.params.id as string;
+            const result = await this._prescriptionService.getPrescriptionById(id);
+            return res.status(result.success ? HttpStatus.OK : HttpStatus.NOT_FOUND).json(result);
+        } catch (error) {
+            next(error);
         }
-        return res.status(404).json(result);
     };
 
-    downloadPdf = async (req: Request, res: Response) => {
-        const id = req.params.id as string;
-        const result = await this._prescriptionService.generatePrescriptionPdf(id);
-        
-        if (result.success && result.data) {
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=prescription-${id}.pdf`);
-            return res.send(result.data);
+    downloadPdf = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+        try {
+            const id = req.params.id as string;
+            const result = await this._prescriptionService.generatePrescriptionPdf(id);
+            
+            if (result.success && result.data) {
+                const filename = result.filename || `prescription-${id}.pdf`;
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+                return res.send(result.data);
+            }
+
+            
+            return res.status(HttpStatus.NOT_FOUND).json(result);
+        } catch (error) {
+            next(error);
         }
-        
-        return res.status(404).json(result);
     };
 }

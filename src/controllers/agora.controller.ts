@@ -1,10 +1,10 @@
-import { Request, Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { AgoraService } from '../services/agora.service';
 import { HttpStatus } from '../constants';
-import logger from '../logger';
+import { AuthenticatedRequest } from '../interfaces/express-request.interface';
 
 export class AgoraController {
-    static getRtcToken(req: Request, res: Response) {
+    static getRtcToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
             const { channelName, uid, role } = req.query;
 
@@ -15,7 +15,6 @@ export class AgoraController {
                 });
             }
 
-            
             const token = AgoraService.generateRtcToken(
                 channelName as string,
                 uid as string || 0,
@@ -27,15 +26,11 @@ export class AgoraController {
                 token
             });
         } catch (error) {
-            logger.error('AgoraController error:', error);
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: 'Failed to generate token'
-            });
+            next(error);
         }
     }
 
-    static getRtmToken(req: Request, res: Response) {
+    static getRtmToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
             const { userId } = req.query;
 
@@ -53,11 +48,7 @@ export class AgoraController {
                 token
             });
         } catch (error) {
-            logger.error('AgoraController error:', error);
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: 'Failed to generate RTM token'
-            });
+            next(error);
         }
     }
 }

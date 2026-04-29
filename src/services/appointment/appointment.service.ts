@@ -15,6 +15,8 @@ import { SocketService } from '../socket.service';
 import cron from 'node-cron';
 import { NotificationHelper } from '../../utils/notification-helper';
 import { ServiceType } from '../../enums/service-type.enum';
+import { AppError } from '../../errors/app-error';
+import { HttpStatus } from '../../constants';
 
 export class AppointmentService implements IAppointmentService {
 
@@ -60,7 +62,7 @@ export class AppointmentService implements IAppointmentService {
         try {
             const now = new Date();
             const reminderTime = new Date(now.getTime() + 5 * 60 * 1000);
-            
+
             const startH = reminderTime.getHours().toString().padStart(2, '0');
             const startM = reminderTime.getMinutes().toString().padStart(2, '0');
             const timeStr = `${startH}:${startM}`;
@@ -105,29 +107,29 @@ export class AppointmentService implements IAppointmentService {
         session.startTransaction();
         try {
             const doctor = await this._doctorRepository.findByIdWithDetails(data.doctorId);
-            if (!doctor) throw new Error('Doctor not found');
+            if (!doctor) throw new AppError('Doctor not found', HttpStatus.NOT_FOUND);
 
             if (!doctor.isActive || !doctor.isVerified || doctor.profileStatus !== 'verified') {
-                throw new Error('Doctor is not currently available for appointments');
+                throw new AppError('Doctor is not currently available for appointments', HttpStatus.BAD_REQUEST);
             }
 
             const doctorUser = doctor.userId as any;
             if (doctorUser && doctorUser.isBlocked) {
-                throw new Error('Doctor is currently unavailable');
+                throw new AppError('Doctor is currently unavailable', HttpStatus.FORBIDDEN);
             }
 
             const pet = await this._petRepository.findById(data.petId);
-            if (!pet) throw new Error('Pet not found');
+            if (!pet) throw new AppError('Pet not found', HttpStatus.NOT_FOUND);
             if (!pet.isActive) {
-                throw new Error('Pet is not active');
+                throw new AppError('Pet is not active', HttpStatus.BAD_REQUEST);
             }
 
             const slot = await Slot.findById(data.slotId).session(session);
             if (!slot || slot.isBooked || slot.isBlocked) {
-                throw new Error('Slot is no longer available');
+                throw new AppError('Slot is no longer available', HttpStatus.BAD_REQUEST);
             }
 
-           
+
             const appointmentDate = new Date(data.appointmentDate);
             const now = new Date();
 
@@ -135,7 +137,7 @@ export class AppointmentService implements IAppointmentService {
             const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
             if (appDateOnly < todayDateOnly) {
-                throw new Error('Cannot book an appointment in the past');
+                throw new AppError('Cannot book an appointment in the past', HttpStatus.BAD_REQUEST);
             }
 
             if (appDateOnly.getTime() === todayDateOnly.getTime()) {
@@ -143,7 +145,7 @@ export class AppointmentService implements IAppointmentService {
                 const slotStartTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startHour, startMin);
 
                 if (slotStartTime < now) {
-                    throw new Error('This slot has already passed for today');
+                    throw new AppError('This slot has already passed for today', HttpStatus.BAD_REQUEST);
                 }
             }
 
@@ -206,7 +208,7 @@ export class AppointmentService implements IAppointmentService {
                     startDate.setHours(0, 0, 0, 0);
                 } else if (timeframe === 'This Week') {
                     const day = now.getDay();
-                    const diff = now.getDate() - day + (day === 0 ? -6 : 1); 
+                    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
                     startDate.setHours(0, 0, 0, 0);
                 } else if (timeframe === 'This Month') {
                     startDate.setFullYear(now.getFullYear(), now.getMonth(), 1);
@@ -287,7 +289,7 @@ export class AppointmentService implements IAppointmentService {
     async updateAppointmentStatus(appointmentId: string, status: AppointmentStatus, userId: string): Promise<{ success: boolean; data?: IAppointment; message?: string }> {
         try {
             const appointment = await this._appointmentRepository.findById(appointmentId);
-            if (!appointment) throw new Error('Appointment not found');
+            if (!appointment) throw new AppError('Appointment not found', HttpStatus.NOT_FOUND);
 
             if (!appointment.appointmentId) {
                 const randomDigits = Math.floor(10000 + Math.random() * 90000).toString();
@@ -311,7 +313,7 @@ export class AppointmentService implements IAppointmentService {
                     appointmentDoctorId === doctorUserId
                 ) || (!!appointmentDoctorUserId && appointmentDoctorUserId === userId);
                 if (!isAuthorizedDoctor) {
-                    throw new Error('Unauthorized');
+                    throw new AppError('Unauthorized', HttpStatus.FORBIDDEN);
                 }
             }
 
@@ -321,7 +323,7 @@ export class AppointmentService implements IAppointmentService {
             if (status === AppointmentStatus.CANCELLED) {
                 await Slot.findByIdAndUpdate(appointment.slotId, { isBooked: false, status: 'available' });
 
-                
+
                 if (appointment.paymentStatus === 'PAID') {
                     await this._paymentService.refund(appointment._id.toString(), 'Appointment cancelled by doctor');
                 }
@@ -383,10 +385,10 @@ export class AppointmentService implements IAppointmentService {
 
         try {
             const appointment = await this._appointmentRepository.findById(appointmentId);
-            if (!appointment) throw new Error('Appointment not found');
+            if (!appointment) throw new AppError('Appointment not found', HttpStatus.NOT_FOUND);
 
             if (appointment.status === AppointmentStatus.COMPLETED || appointment.status === AppointmentStatus.CANCELLED) {
-                throw new Error('Cannot cancel this appointment');
+                throw new AppError('Cannot cancel this appointment', HttpStatus.BAD_REQUEST);
             }
 
             const now = new Date();
@@ -436,7 +438,7 @@ export class AppointmentService implements IAppointmentService {
 
             else {
                 if (appointment.status === AppointmentStatus.ONGOING) {
-                    throw new Error('No cancellation available for this situation - Appointment is already ongoing.');
+                    throw new AppError('No cancellation available for this situation - Appointment is already ongoing.', HttpStatus.BAD_REQUEST);
                 }
             }
 
@@ -444,7 +446,7 @@ export class AppointmentService implements IAppointmentService {
             if (shouldRefund && appointment.paymentStatus === 'PAID' && appointment.paymentMethod !== 'cod') {
                 const refundResult = await this._paymentService.refund(appointment._id.toString(), finalReason, session);
                 if (!refundResult.success) {
-                    throw new Error(`Refund failed: ${refundResult.message}`);
+                    throw new AppError(`Refund failed: ${refundResult.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
                 refundTriggered = true;
             }
@@ -510,10 +512,10 @@ export class AppointmentService implements IAppointmentService {
             const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
             const [y, m, d] = dateStr.split('-').map(Number);
 
-          
+
             const startOfDay = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
-            
-            const searchStart = new Date(startOfDay.getTime() - (6 * 60 * 60 * 1000)); 
+
+            const searchStart = new Date(startOfDay.getTime() - (6 * 60 * 60 * 1000));
             const searchEnd = new Date(startOfDay.getTime() + (30 * 60 * 60 * 1000));
 
             const requestedDate = new Date(y, m - 1, d);
@@ -521,7 +523,7 @@ export class AppointmentService implements IAppointmentService {
             logger.info(`[AppointmentService] Fetching slots for Doctor: ${doctorId} on Date: ${dateStr}. Search range: ${searchStart.toISOString()} - ${searchEnd.toISOString()}`);
 
             const doctor = await this._doctorRepository.findById(doctorId);
-            if (!doctor) throw new Error('Doctor not found');
+            if (!doctor) throw new AppError('Doctor not found', HttpStatus.NOT_FOUND);
 
 
             if (doctor.recurringSchedules && doctor.recurringSchedules.length > 0) {
@@ -567,12 +569,12 @@ export class AppointmentService implements IAppointmentService {
                 date: { $gte: searchStart, $lte: searchEnd }
             }).sort({ startTime: 1 });
 
-          
+
             let slots = allSlots.filter((s: any) => {
                 const sDate = new Date(s.date);
-                
+
                 const diffHours = Math.abs(sDate.getTime() - startOfDay.getTime()) / (1000 * 60 * 60);
-                return diffHours < 12; 
+                return diffHours < 12;
             });
 
             if (slots.length > 0) {
@@ -599,7 +601,7 @@ export class AppointmentService implements IAppointmentService {
                 const occDuration = parseInt(businessDay.duration) || doctor.appointmentDuration || 30;
                 const occCycleTime = occDuration + PLATFORM_BUFFER;
 
-               
+
                 if (businessDay.slots && businessDay.slots.length > 0) {
                     logger.info(`[AppointmentService] Generating slots from custom businessDay.slots array (${businessDay.slots.length} slots)`);
                     for (const sTime of businessDay.slots) {
@@ -622,7 +624,7 @@ export class AppointmentService implements IAppointmentService {
                         });
                     }
                 } else {
-                    
+
                     logger.info(`[AppointmentService] Generating slots using time-range loop (${businessDay.startTime} - ${businessDay.endTime})`);
                     const occStartTime = businessDay.startTime || "09:00";
                     const occEndTime = businessDay.endTime || "17:00";
@@ -658,7 +660,7 @@ export class AppointmentService implements IAppointmentService {
                 }
             }
 
-            
+
             if (newSlotsData.length === 0 && doctor.recurringSchedules && doctor.recurringSchedules.length > 0) {
                 logger.info(`[AppointmentService] Falling back to recurring schedules for generation`);
                 const { rrulestr } = require('rrule');
@@ -785,7 +787,7 @@ export class AppointmentService implements IAppointmentService {
                         };
                         await appt.save();
 
-                        
+
                         if (shouldRefund && appt.paymentStatus === 'PAID' && appt.paymentMethod !== 'cod') {
                             try {
                                 await this._paymentService.refund(appt._id.toString(), cancelReason);
@@ -798,7 +800,7 @@ export class AppointmentService implements IAppointmentService {
                             await Slot.findByIdAndUpdate(appt.slotId._id, { status: 'available', isBooked: false });
                         }
 
-                        
+
                         if (SocketService.io) {
                             SocketService.io.to(`appointment:${appt._id}`).emit('status-updated', {
                                 status: AppointmentStatus.CANCELLED,
@@ -811,7 +813,7 @@ export class AppointmentService implements IAppointmentService {
                 }
             }
 
-            
+
             const activeAppointments = await (this._appointmentRepository as any).model.find({
                 status: AppointmentStatus.ONGOING
             }).populate('slotId');
@@ -823,7 +825,7 @@ export class AppointmentService implements IAppointmentService {
 
                 // Scenario 11: Auto checkout after slot time
                 if (now > apptEnd) {
-                    
+
                     appt.checkOut = {
                         ownerCheckOutTime: appt.checkOut?.ownerCheckOutTime || apptEnd,
                         vetCheckOutTime: appt.checkOut?.vetCheckOutTime || apptEnd
@@ -831,14 +833,14 @@ export class AppointmentService implements IAppointmentService {
 
                     appt.status = AppointmentStatus.COMPLETED;
 
-                    
+
                     if ((appt.paymentMethod === 'cod' || appt.paymentMethod === 'cash') && appt.paymentStatus === 'PENDING') {
                         appt.paymentStatus = 'PAID';
                     }
 
                     await appt.save();
 
-                    
+
                     const doc: any = await (this._appointmentRepository as any).model.db.model('Doctor').findById(appt.doctorId).populate('userId');
                     if (doc && doc.userId) {
                         await this._paymentService.creditDoctorWallet(
@@ -890,13 +892,13 @@ export class AppointmentService implements IAppointmentService {
 
             const graceEnd = new Date(apptStart.getTime() + 5 * 60 * 1000);
 
-           
+
             if (now < apptStart) {
-                
+
                 throw new Error('Appointment has not started yet');
             }
 
-           
+
             if (now > graceEnd) {
                 const hasOwnerCheckedIn = !!appt.checkIn?.ownerCheckInTime;
                 const hasDoctorCheckedIn = !!appt.checkIn?.vetCheckInTime;
@@ -933,7 +935,7 @@ export class AppointmentService implements IAppointmentService {
                 };
                 await appt.save();
 
-                
+
                 if (appt.slotId) {
                     await Slot.findByIdAndUpdate(appt.slotId, {
                         isBooked: false,
@@ -941,7 +943,7 @@ export class AppointmentService implements IAppointmentService {
                     });
                 }
 
-           
+
                 if (shouldRefund && appt.paymentStatus === 'PAID') {
                     try {
                         await this._paymentService.refund(appt._id.toString(), cancelReason);
@@ -953,7 +955,7 @@ export class AppointmentService implements IAppointmentService {
                 throw new Error(cancelReason);
             }
 
-           
+
             if (role === 'doctor') {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -961,7 +963,7 @@ export class AppointmentService implements IAppointmentService {
                 const previousAppointments = await Appointment.find({
                     doctorId: appt.doctorId,
                     appointmentDate: { $gte: today, $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000) },
-                    
+
                     $or: [
                         { status: AppointmentStatus.COMPLETED, prescriptionId: { $exists: false } },
                         {
@@ -1026,7 +1028,7 @@ export class AppointmentService implements IAppointmentService {
 
             const manualCheckOutStart = new Date(apptEnd.getTime() - 5 * 60 * 1000);
 
-           
+
             if (now < manualCheckOutStart) {
                 throw new Error('Cannot checkout early. Please attend at least 25 minutes of the consultation.');
             }
@@ -1043,7 +1045,7 @@ export class AppointmentService implements IAppointmentService {
                 };
                 appt.status = AppointmentStatus.COMPLETED;
 
-              
+
                 const doc: any = await (this._appointmentRepository as any).model.db.model('Doctor').findById(appt.doctorId).populate('userId');
                 if (doc && doc.userId) {
                     await this._paymentService.creditDoctorWallet(
@@ -1054,10 +1056,10 @@ export class AppointmentService implements IAppointmentService {
                     );
                 }
 
-                
+
                 logger.info(`Manual-checkout diagnostic for ${appt.appointmentId}: method=${appt.paymentMethod}, paymentStatus=${appt.paymentStatus}`);
 
-                
+
                 if ((appt.paymentMethod === 'cod' || appt.paymentMethod === 'cash') && appt.paymentStatus === 'PENDING') {
                     appt.paymentStatus = 'PAID';
                     logger.info(`Manually completed COD appointment ${appt.appointmentId}: Payment marked as PAID`);
@@ -1068,7 +1070,7 @@ export class AppointmentService implements IAppointmentService {
                     const doc: any = await (this._appointmentRepository as any).model.db.model('Doctor').findById(appt.doctorId).populate('userId');
                     const doctorName = doc?.userId?.username || 'Doctor';
                     const doctorUserId = doc?.userId?._id?.toString() || doc?.userId?.toString();
-                    
+
                     await NotificationHelper.notifyAppointmentCompleted(
                         this.extractId(appt.ownerId),
                         doctorUserId,
@@ -1266,7 +1268,7 @@ export class AppointmentService implements IAppointmentService {
             const appointment = await this._appointmentRepository.findById(appointmentId);
             if (!appointment) return { success: false, message: 'Appointment not found' };
 
-            
+
             if (appointment.status !== AppointmentStatus.PAYMENT_PENDING) {
                 return { success: false, message: 'Only pending appointments can be cancelled via this method' };
             }
@@ -1344,8 +1346,8 @@ export class AppointmentService implements IAppointmentService {
             const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
             const [y, m, d] = dateStr.split('-').map(Number);
             const startOfDay = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
-            
-            const searchStart = new Date(startOfDay.getTime() - (6 * 60 * 60 * 1000)); 
+
+            const searchStart = new Date(startOfDay.getTime() - (6 * 60 * 60 * 1000));
             const searchEnd = new Date(startOfDay.getTime() + (30 * 60 * 60 * 1000));
 
             // Ensure slots exist for this day
@@ -1365,7 +1367,7 @@ export class AppointmentService implements IAppointmentService {
             const populatedSlots = await Promise.all(daySlots.map(async (slot) => {
                 const slotObj = slot.toObject() as any;
                 if (slot.isBooked) {
-                    const appointment = await Appointment.findOne({ 
+                    const appointment = await Appointment.findOne({
                         slotId: slot._id,
                         status: { $ne: AppointmentStatus.CANCELLED }
                     });
@@ -1378,8 +1380,8 @@ export class AppointmentService implements IAppointmentService {
                     }
                 } else if (slot.isBlocked) {
                     slotObj.status = 'Blocked';
-                } else if (slot.slotType === ServiceType.SUBSCRIPTION) { 
-                     slotObj.status = 'Subscription';
+                } else if (slot.slotType === ServiceType.SUBSCRIPTION) {
+                    slotObj.status = 'Subscription';
                 } else {
                     // Check for cancelled appointments to show in Red
                     const cancelledAppt = await Appointment.findOne({

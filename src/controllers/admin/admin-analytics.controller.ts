@@ -12,7 +12,12 @@ export class AdminAnalyticsController {
 
     getDashboardStats = async (req: Request, res: Response): Promise<void> => {
         try {
-            const stats = await this._analyticsService.getDashboardStats();
+            const { from, to, grouping } = req.query;
+            const stats = await this._analyticsService.getDashboardStats({
+                from: from as string,
+                to: to as string,
+                grouping: grouping as string
+            });
             res.status(HttpStatus.OK).json({ success: true, ...stats });
         } catch (error: any) {
             logger.error('Error fetching dashboard stats', { error: error.message });

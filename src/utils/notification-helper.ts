@@ -21,7 +21,7 @@ export class NotificationHelper {
         const ownerTitle = 'Appointment Booked';
         const ownerMsg = `Great! Your appointment for ${petName} has been booked for ${time} on ${date}.`;
         const ownerLink = `/owner/bookings/${appointmentId}`;
-        
+
         const doctorTitle = 'New Appointment Booking';
         const doctorMsg = `A new appointment for ${petName} has been booked for ${time} on ${date}.`;
         const doctorLink = `/doctor/appointments/${appointmentId}`;
@@ -50,7 +50,7 @@ export class NotificationHelper {
     static async notifyAppointmentReminder(ownerId: string, doctorUserId: string, petName: string, time: string, appointmentId: string) {
         const title = 'Appointment Reminder';
         const msg = `Your appointment for ${petName} starts in 5 minutes at ${time}.`;
-        
+
         await Promise.all([
             this.create(ownerId, title, msg, 'appointment', `/owner/bookings/${appointmentId}`),
             this.create(doctorUserId, title, msg, 'appointment', `/doctor/appointments/${appointmentId}`)
@@ -66,7 +66,7 @@ export class NotificationHelper {
             this.create(ownerId, title, msg, 'appointment', link),
             this.create(doctorUserId, title, `The appointment for ${petName} has been marked as complete.`, 'appointment', `/doctor/appointments/${appointmentId}`)
         ]);
-        
+
         // Follow up for prescription
         const rxTitle = 'Check Prescription';
         const rxMsg = `A prescription has been generated for ${petName}. Please check it in your dashboard.`;
@@ -76,7 +76,7 @@ export class NotificationHelper {
     static async notifyAppointmentCancelled(ownerId: string, doctorUserId: string, petName: string, date: string, reason: string, appointmentId: string, cancelledByRole: string) {
         const title = 'Appointment Cancelled';
         const msg = `The appointment for ${petName} on ${date} has been cancelled. Reason: ${reason}`;
-        
+
         if (cancelledByRole === 'doctor') {
             await this.create(ownerId, title, msg, 'appointment', `/owner/bookings/${appointmentId}`);
         } else {
@@ -89,7 +89,7 @@ export class NotificationHelper {
         const adminTitle = 'New Withdrawal Request';
         const adminMsg = `Dr. ${doctorName} has requested a withdrawal of ₹${amount}.`;
         const adminLink = `/admin/transactions`;
-        
+
         const doctorTitle = 'Withdrawal Request Submitted';
         const doctorMsg = `Your withdrawal request for ₹${amount} has been submitted for admin approval.`;
         const doctorLink = `/doctor/wallet`;

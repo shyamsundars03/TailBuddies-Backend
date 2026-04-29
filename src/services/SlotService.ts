@@ -7,6 +7,9 @@ import logger from '../logger';
 import { Slot } from '../models/slot.model';
 import { Appointment } from '../models/appointment.model';
 
+import { AppError } from '../errors/app-error';
+import { HttpStatus } from '../constants';
+
 export class SlotService implements ISlotService {
     private readonly _slotRepository: ISlotRepository;
     private readonly _doctorRepository: IDoctorRepository;
@@ -27,7 +30,7 @@ export class SlotService implements ISlotService {
         session.startTransaction();
         try {
             const doctor = await this._doctorRepository.findByUserId(userId);
-            if (!doctor) throw new Error('Doctor not found');
+            if (!doctor) throw new AppError('Doctor not found', HttpStatus.NOT_FOUND);
 
             const now = new Date();
 
@@ -37,7 +40,7 @@ export class SlotService implements ISlotService {
 
                 // 1. Authorization check
                 if (slot.vetId.toString() !== doctor._id.toString()) {
-                    throw new Error('Unauthorized to block this slot');
+                    throw new AppError('Unauthorized to block this slot', HttpStatus.FORBIDDEN);
                 }
 
                 // 2. Future check
@@ -46,7 +49,7 @@ export class SlotService implements ISlotService {
                 slotDateTime.setHours(startH, startM, 0, 0);
 
                 if (slotDateTime <= now) {
-                    throw new Error(`Cannot block past slot: ${slot.startTime}`);
+                    throw new AppError(`Cannot block past slot: ${slot.startTime}`, HttpStatus.BAD_REQUEST);
                 }
 
                 // 3. Handle existing appointments
@@ -61,7 +64,7 @@ export class SlotService implements ISlotService {
                             session
                         );
                         if (!cancelResult.success) {
-                            throw new Error(`Failed to cancel appointment for slot ${slot.startTime}: ${cancelResult.message}`);
+                            throw new AppError(`Failed to cancel appointment for slot ${slot.startTime}: ${cancelResult.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
                         }
                     }
                 }
@@ -90,14 +93,14 @@ export class SlotService implements ISlotService {
         session.startTransaction();
         try {
             const doctor = await this._doctorRepository.findByUserId(userId);
-            if (!doctor) throw new Error('Doctor not found');
+            if (!doctor) throw new AppError('Doctor not found', HttpStatus.NOT_FOUND);
 
             for (const slotId of slotIds) {
                 const slot = await Slot.findById(slotId).session(session);
                 if (!slot) continue;
 
                 if (slot.vetId.toString() !== doctor._id.toString()) {
-                    throw new Error('Unauthorized to unblock this slot');
+                    throw new AppError('Unauthorized to unblock this slot', HttpStatus.FORBIDDEN);
                 }
 
                 if (!slot.isBlocked) continue;

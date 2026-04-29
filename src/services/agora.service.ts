@@ -9,13 +9,13 @@ export class AgoraService {
     private static stringToUid(uid: any): number {
         if (typeof uid === 'number') return uid >>> 0;
         if (!uid || uid === '0') return 0;
-        
-       
+
+
         if (typeof uid === 'string' && /^\d+$/.test(uid) && uid.length < 10) {
             return parseInt(uid, 10) >>> 0;
         }
 
-        
+
         let hash = 0;
         const str = String(uid);
         for (let i = 0; i < str.length; i++) {
@@ -30,8 +30,8 @@ export class AgoraService {
             const numericUid = this.stringToUid(uid);
             const currentTimestamp = Math.floor(Date.now() / 1000);
             const privilegeExpiredTs = currentTimestamp + 3600;
-            const rtcRole = role === 'publisher' 
-                ? RtcRole.PUBLISHER 
+            const rtcRole = role === 'publisher'
+                ? RtcRole.PUBLISHER
                 : RtcRole.SUBSCRIBER;
 
             const appId = (process.env.AGORA_APP_ID || '').trim();
@@ -48,10 +48,10 @@ export class AgoraService {
                 console.error("CRITICAL: Agora App ID or Certificate is MISSING in environment variables!");
             }
 
-            
+
             const token = RtcTokenBuilder.buildTokenWithUid(
                 appId,
-                appCertificate, 
+                appCertificate,
                 channelName,
                 numericUid,
                 rtcRole,

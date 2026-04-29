@@ -294,22 +294,22 @@ export class ReviewService {
     private async updateDoctorRating(doctorId: string): Promise<void> {
         try {
             logger.info(`Recalculating rating for doctor: ${doctorId}`);
-            
+
             const docIdObj = new mongoose.Types.ObjectId(doctorId);
             const reviews = await this.reviewRepository.model.find({ doctorId: docIdObj });
-            
+
             const count = reviews.length;
             const average = count > 0
                 ? reviews.reduce((acc: number, curr: any) => acc + curr.rating, 0) / count
                 : 0;
 
             const finalRating = Math.floor(average);
-            
+
             await this.doctorRepository.update(doctorId, {
                 averageRating: finalRating,
                 reviewCount: count
             } as any);
-            
+
             logger.info(`Updated doctor ${doctorId}: Rating=${finalRating}, Reviews=${count}`);
         } catch (error: any) {
             logger.error(`Error updating doctor rating for ${doctorId}: ${error.message}`);

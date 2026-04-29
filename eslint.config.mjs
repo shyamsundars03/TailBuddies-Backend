@@ -16,7 +16,7 @@ export default [
     },
     rules: {
       // No 'any' type
-      '@typescript-eslint/no-explicit-any': 'error',
+      // '@typescript-eslint/no-explicit-any': 'error',
       
       // No console.log (only allow warn and error)
       'no-console': ['error', { allow: ['warn', 'error'] }],

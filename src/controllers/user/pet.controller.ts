@@ -1,12 +1,10 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../middleware/auth.middleware';
+import { Response, NextFunction } from 'express';
 import { IPetService } from '../../services/interfaces/IPetService';
 import { HttpStatus } from '../../constants';
 import logger from '../../logger';
+import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 
 export class UserPetController {
-
-
 
     private readonly _petService: IPetService;
 
@@ -14,11 +12,7 @@ export class UserPetController {
         this._petService = petService;
     }
 
-
-
-
-
-    addPet = async (req: AuthRequest, res: Response): Promise<void> => {
+    addPet = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -33,13 +27,11 @@ export class UserPetController {
                 bodyData.picture = files.picture[0].path;
             }
 
-            
             if (typeof bodyData.vaccinations === 'string') {
                 bodyData.vaccinations = JSON.parse(bodyData.vaccinations);
             }
 
             if (files?.certificates?.length && Array.isArray(bodyData.vaccinations)) {
-                
                 files.certificates.forEach((cert, index) => {
                     if (bodyData.vaccinations[index]) {
                         bodyData.vaccinations[index].certificate = cert.path;
@@ -48,28 +40,13 @@ export class UserPetController {
             }
 
             const pet = await this._petService.addPet(userId, bodyData);
-            
-            
-            
             res.status(HttpStatus.CREATED).json({ success: true, data: pet, message: 'Pet added successfully' });
-
-
-
         } catch (error: any) {
-            logger.error('Error adding pet', { error: error.message });
-            res.status(HttpStatus.BAD_REQUEST).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-    getOwnerPets = async (req: AuthRequest, res: Response): Promise<void> => {
+    getOwnerPets = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             if (!userId) {
@@ -82,22 +59,13 @@ export class UserPetController {
             const search = req.query.search as string | undefined;
 
             const result = await this._petService.getOwnerPets(userId, page, limit, search);
-            
             res.status(HttpStatus.OK).json({ success: true, data: result });
-        
-        
-        
         } catch (error: any) {
-            logger.error('Error fetching owner pets', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ success: false, message: 'Failed to fetch pets' });
+            next(error);
         }
     };
 
-
-
-
-
-    getPetById = async (req: AuthRequest, res: Response): Promise<void> => {
+    getPetById = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             const id = req.params.id as string;
@@ -116,18 +84,11 @@ export class UserPetController {
 
             res.status(HttpStatus.OK).json({ success: true, data: pet });
         } catch (error: any) {
-            logger.error('Error fetching pet by id', { error: error.message });
-            res.status(HttpStatus.NOT_FOUND).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-    updatePet = async (req: AuthRequest, res: Response): Promise<void> => {
+    updatePet = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             const id = req.params.id as string;
@@ -158,21 +119,11 @@ export class UserPetController {
             const pet = await this._petService.updatePet(id, userId, bodyData);
             res.status(HttpStatus.OK).json({ success: true, data: pet, message: 'Pet updated successfully' });
         } catch (error: any) {
-            logger.error('Error updating pet', { error: error.message });
-            res.status(HttpStatus.BAD_REQUEST).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-    toggleActiveStatus = async (req: AuthRequest, res: Response): Promise<void> => {
+    toggleActiveStatus = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             const id = req.params.id as string;
@@ -191,24 +142,11 @@ export class UserPetController {
             const pet = await this._petService.toggleActiveStatus(id, userId, isActive);
             res.status(HttpStatus.OK).json({ success: true, data: pet, message: 'Pet status updated successfully' });
         } catch (error: any) {
-            logger.error('Error toggling pet status', { error: error.message });
-            res.status(HttpStatus.BAD_REQUEST).json({ success: false, message: error.message });
+            next(error);
         }
     };
 
-
-
-
-
-
-
-
-
-
-
-
-
-    deletePet = async (req: AuthRequest, res: Response): Promise<void> => {
+    deletePet = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user?.userId;
             const id = req.params.id as string;
@@ -221,18 +159,7 @@ export class UserPetController {
             await this._petService.deletePet(id, userId);
             res.status(HttpStatus.OK).json({ success: true, message: 'Pet deleted successfully' });
         } catch (error: any) {
-            logger.error('Error deleting pet', { error: error.message });
-            res.status(HttpStatus.BAD_REQUEST).json({ success: false, message: error.message });
+            next(error);
         }
     };
-
-
-
-
-
-
-
-
-
-    
 }

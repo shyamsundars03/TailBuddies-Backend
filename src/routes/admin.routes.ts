@@ -40,7 +40,7 @@ router.patch('/users/:id/block', adminController.toggleUserBlock);
 router.get('/doctors', adminController.getDoctors);
 router.get('/doctors/:id', adminController.getDoctorById);
 router.patch('/doctors/:id/verify', adminController.verifyDoctor);
-router.patch('/doctors/:id/reject', (req, res) => adminController.verifyDoctor(req, res)); // Re-using verifyDoctor but it handles rejection now
+router.patch('/doctors/:id/reject', adminController.verifyDoctor); // Re-using verifyDoctor but it handles rejection now
 
 // Pet Management (Admin)
 router.get('/pets', adminPetController.getAllPets);
