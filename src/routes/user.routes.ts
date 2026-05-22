@@ -1,31 +1,53 @@
-import { Router } from 'express';
+import { Router, RequestHandler } from 'express';
 import { userController, authController, userPetController } from '../config/di';
 import { authMiddleware } from '../middleware/auth.middleware';
-import { upload, uploadDoc } from '../middleware/upload.middleware';
+import { ownerOnly } from '../middleware/role.middleware';
+import { validateRequest } from '../middleware/zod-validation.middleware';
+// import { upload, uploadDoc } from '../middleware/upload.middleware';
+import { uploadDoc } from '../middleware/upload.middleware';
+import {
+    UpdateProfileSchema,
+    ProfilePicSchema,
+    OtpSchema,
+    NewEmailSchema,
+    VerifyNewEmailSchema,
+} from '../dto/user/user.schema';
+import { ChangePasswordSchema } from '../dto/auth/auth.schema';
+import { ToggleActiveSchema } from '../dto/pet/pet.schema';
 
 const router = Router();
 
-// All user routes are protected
-router.use(authMiddleware);
+router.use(authMiddleware as unknown as RequestHandler);
 
+// Profile (authenticated users)
 router.get('/profile', userController.getProfile);
-router.put('/profile', userController.updateProfile);
-router.patch('/profile-pic', userController.updateProfilePic);
+router.put('/profile', validateRequest(UpdateProfileSchema), userController.updateProfile);
+router.patch('/profile-pic', validateRequest(ProfilePicSchema), userController.updateProfilePic);
 
-// Email Change Flow
+// Email change flow
 router.post('/change-email/initiate', userController.initiateEmailChange);
-router.post('/change-email/verify-current', userController.verifyCurrentEmail);
-router.post('/change-email/send-otp-new', userController.sendOtpToNewEmail);
-router.post('/change-email/verify-new', userController.verifyNewEmail);
+router.post('/change-email/verify-current', validateRequest(OtpSchema), userController.verifyCurrentEmail);
+router.post('/change-email/send-otp-new', validateRequest(NewEmailSchema), userController.sendOtpToNewEmail);
+router.post('/change-email/verify-new', validateRequest(VerifyNewEmailSchema), userController.verifyNewEmail);
 
-router.post('/change-password', authController.changePassword);
+router.post('/change-password', validateRequest(ChangePasswordSchema), authController.changePassword);
 
-// Pet Management (Owner)
-router.post('/pets', uploadDoc.fields([{ name: 'picture', maxCount: 1 }, { name: 'certificates', maxCount: 10 }]), userPetController.addPet);
-router.get('/pets', userPetController.getOwnerPets);
-router.get('/pets/:id', userPetController.getPetById);
-router.put('/pets/:id', uploadDoc.fields([{ name: 'picture', maxCount: 1 }, { name: 'certificates', maxCount: 10 }]), userPetController.updatePet);
-router.patch('/pets/:id/status', userPetController.toggleActiveStatus);
-router.delete('/pets/:id', userPetController.deletePet);
+// Pet management (owner only)
+router.post(
+    '/pets',
+    ownerOnly as unknown as RequestHandler,
+    uploadDoc.fields([{ name: 'picture', maxCount: 1 }, { name: 'certificates', maxCount: 10 }]),
+    userPetController.addPet
+);
+router.get('/pets', ownerOnly as unknown as RequestHandler, userPetController.getOwnerPets);
+router.get('/pets/:id', ownerOnly as unknown as RequestHandler, userPetController.getPetById);
+router.put(
+    '/pets/:id',
+    ownerOnly as unknown as RequestHandler,
+    uploadDoc.fields([{ name: 'picture', maxCount: 1 }, { name: 'certificates', maxCount: 10 }]),
+    userPetController.updatePet
+);
+router.patch('/pets/:id/status', ownerOnly as unknown as RequestHandler, validateRequest(ToggleActiveSchema), userPetController.toggleActiveStatus);
+router.delete('/pets/:id', ownerOnly as unknown as RequestHandler, userPetController.deletePet);
 
 export default router;

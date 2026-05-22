@@ -1,7 +1,9 @@
-import { Response, NextFunction } from 'express';
+import { Response } from 'express';
 import { INotificationService } from '../services/notification.service';
 import { HttpStatus } from '../constants';
 import { AuthenticatedRequest } from '../interfaces/express-request.interface';
+import { ApiResponse } from '../utils/api-response';
+import { UnauthorizedError } from '../errors/app-error';
 
 export class NotificationController {
     private readonly _notificationService: INotificationService;
@@ -10,45 +12,27 @@ export class NotificationController {
         this._notificationService = notificationService;
     }
 
-    getUserNotifications = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
+    getUserNotifications = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
 
-            const status = req.query.status as string; // 'unread' or undefined (for all)
-            const notifications = await this._notificationService.getNotifications(userId, status);
-            
-            res.status(HttpStatus.OK).json({ success: true, notifications });
-        } catch (error: any) {
-            next(error);
-        }
+        const status = req.query.status as string | undefined;
+        const notifications = await this._notificationService.getNotifications(userId, status);
+        
+        res.status(HttpStatus.OK).json(ApiResponse.success('Notifications fetched', notifications));
     };
 
-    markAsRead = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const { id } = req.params;
-            const success = await this._notificationService.markAsRead(String(id));
-            res.status(HttpStatus.OK).json({ success });
-        } catch (error: any) {
-            next(error);
-        }
+    markAsRead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const { id } = req.params;
+        await this._notificationService.markAsRead(String(id));
+        res.status(HttpStatus.OK).json(ApiResponse.success('Notification marked as read'));
     };
 
-    markAllRead = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
+    markAllRead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
 
-            await this._notificationService.markAllAsRead(userId);
-            res.status(HttpStatus.OK).json({ success: true });
-        } catch (error: any) {
-            next(error);
-        }
+        await this._notificationService.markAllAsRead(userId);
+        res.status(HttpStatus.OK).json(ApiResponse.success('All notifications marked as read'));
     };
 }

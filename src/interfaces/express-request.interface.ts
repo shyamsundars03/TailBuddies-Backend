@@ -6,4 +6,5 @@ export interface AuthenticatedRequest extends Request {
         role: string;
         email?: string;
     };
+    validatedQuery?: Record<string, unknown>;
 }

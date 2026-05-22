@@ -136,8 +136,9 @@ userSchema.methods.comparePassword = async function (candidatePassword: string):
 
 userSchema.post('init', function (doc) {
   // Handle legacy userName field by mapping it to username
-  if ((doc as any).userName && !doc.username) {
-    doc.username = (doc as any).userName;
+  const legacy = doc as IUser & { userName?: string };
+  if (legacy.userName && !doc.username) {
+    doc.username = legacy.userName;
   }
 });
 

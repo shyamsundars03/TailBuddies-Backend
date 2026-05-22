@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, RequestHandler, Response } from 'express';
+import { asMiddleware } from '../utils/express-handler';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { AppError } from '../errors/app-error';
@@ -17,7 +18,7 @@ export interface AuthRequest extends Request {
 
 import { User } from '../models/user.models';
 
-export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authMiddleware: RequestHandler = asMiddleware(async (req: AuthRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -49,4 +50,4 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
         if (error instanceof AppError) return next(error);
         return next(new AppError(ErrorMessages.TOKEN_INVALID, HttpStatus.UNAUTHORIZED));
     }
-};
+});

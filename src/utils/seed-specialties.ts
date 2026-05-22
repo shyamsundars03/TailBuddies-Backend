@@ -18,7 +18,7 @@ const Specialty = mongoose.model('Specialty', SpecialtySchema);
 async function seedSpecialties() {
     try {
         await mongoose.connect(process.env.MONGO_URI || '');
-        console.log('Connected to MongoDB');
+        // console.log('Connected to MongoDB');
 
         const specialties = [
             {
@@ -57,10 +57,10 @@ async function seedSpecialties() {
                 spec,
                 { upsert: true, new: true }
             );
-            console.log(`Ensured specialty: ${spec.name}`);
+            // console.log(`Ensured specialty: ${spec.name}`);
         }
 
-        console.log('Seed completed successfully');
+        // console.log('Seed completed successfully');
         process.exit(0);
     } catch (error) {
         console.error('Seed failed:', error);

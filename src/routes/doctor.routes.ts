@@ -34,7 +34,7 @@ router.post('/upload-document', uploadDoc.single('document'), (req, res) => {
     res.status(HttpStatus.OK).json({
         success: true,
         data: {
-            url: (req.file as any).path,
+            url: req.file?.path ?? '',
             filename: req.file.filename,
         }
     });

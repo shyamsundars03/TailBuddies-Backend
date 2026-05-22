@@ -1,52 +1,114 @@
-import mongoose from 'mongoose';
-import { Appointment } from '../models/appointment.model';
-import { User } from '../models/user.models';
-import { Pet } from '../models/pet.model';
-import { Doctor } from '../models/doctor.model';
-import { Specialty } from '../models/specialty.model';
+import { IAppointmentRepository } from '../repositories/interfaces/IAppointmentRepository';
+import { IDoctorRepository } from '../repositories/interfaces/IDoctorRepository';
+import { IUserRepository } from '../repositories/interfaces/IUserRepository';
+import { IPetRepository } from '../repositories/interfaces/IPetRepository';
+import { ISpecialtyRepository } from '../repositories/interfaces/ISpecialtyRepository';
 import { AppointmentStatus } from '../enums/appointment-status.enum';
+import { UserRole } from '../enums/user-role.enum';
+// import mongoose from 'mongoose';
+
+export interface DashboardStats {
+    cards: {
+        totalDoctors: number;
+        totalPets: number;
+        totalOwners: number;
+        totalRevenue: number;
+    };
+    graphData: {
+        labels: string[];
+        revenue: number[];
+        appointments: number[];
+    };
+}
+
+export interface ReportItem {
+    sNo: number;
+    doctorId: string;
+    doctorName: string;
+    email: string;
+    phone: string;
+    profilePic: string;
+    specialty: string;
+    memberSince: Date;
+    earned: number;
+    noOfAppointments: number;
+}
+
+export interface SpecialtyStat {
+    specialtyName: string;
+    noOfDoctors: number;
+    noOfAppointments: number;
+    revenue: number;
+}
 
 export interface IAdminAnalyticsService {
-    getDashboardStats(filters?: { from?: string; to?: string; grouping?: string }): Promise<any>;
-    getReportsData(filters: { from?: string; to?: string; specialtyId?: string; search?: string }): Promise<any>;
-    getSpecialtyStats(filters: { from?: string; to?: string }): Promise<any>;
+    getDashboardStats(filters?: { from?: string; to?: string; grouping?: string }): Promise<DashboardStats>;
+    getReportsData(filters: { from?: string; to?: string; specialtyId?: string; search?: string; page?: number; limit?: number }): Promise<{ reports: ReportItem[], total: number }>;
+    getSpecialtyStats(filters: { from?: string; to?: string }): Promise<SpecialtyStat[]>;
 }
 
 export class AdminAnalyticsService implements IAdminAnalyticsService {
-    async getDashboardStats(filters: { from?: string; to?: string; grouping?: string } = {}): Promise<any> {
+    private readonly _appointmentRepository: IAppointmentRepository;
+    private readonly _doctorRepository: IDoctorRepository;
+    private readonly _userRepository: IUserRepository;
+    private readonly _petRepository: IPetRepository;
+    private readonly _specialtyRepository: ISpecialtyRepository;
+
+    constructor(
+        appointmentRepository: IAppointmentRepository,
+        doctorRepository: IDoctorRepository,
+        userRepository: IUserRepository,
+        petRepository: IPetRepository,
+        specialtyRepository: ISpecialtyRepository
+    ) {
+        this._appointmentRepository = appointmentRepository;
+        this._doctorRepository = doctorRepository;
+        this._userRepository = userRepository;
+        this._petRepository = petRepository;
+        this._specialtyRepository = specialtyRepository;
+    }
+
+    private _buildDateMatch(from?: string, to?: string): Record<string, Record<string, Date>> {
+        const dateMatch: Record<string, Record<string, Date>> = {};
+        if (from || to) {
+            const range: Record<string, Date> = {};
+            if (from && from.trim() !== "") {
+                const fromDate = new Date(from);
+                if (!isNaN(fromDate.getTime())) range.$gte = fromDate;
+            }
+            if (to && to.trim() !== "") {
+                const toDate = new Date(to);
+                if (!isNaN(toDate.getTime())) range.$lte = toDate;
+            }
+            if (Object.keys(range).length > 0) {
+                dateMatch.appointmentDate = range;
+            }
+        }
+        return dateMatch;
+    }
+    async getDashboardStats(filters: { from?: string; to?: string; grouping?: string } = {}): Promise<DashboardStats> {
         try {
             const { from, to, grouping = 'month' } = filters;
 
             // Base match for date range
-            const dateMatch: any = {};
-            if (from || to) {
-                dateMatch.appointmentDate = {};
-                if (from && from.trim() !== "") {
-                    const fromDate = new Date(from);
-                    if (!isNaN(fromDate.getTime())) dateMatch.appointmentDate.$gte = fromDate;
-                }
-                if (to && to.trim() !== "") {
-                    const toDate = new Date(to);
-                    if (!isNaN(toDate.getTime())) dateMatch.appointmentDate.$lte = toDate;
-                }
-                // If the object is empty after checks, remove it
-                if (Object.keys(dateMatch.appointmentDate).length === 0) delete dateMatch.appointmentDate;
-            }
+            const dateMatch = this._buildDateMatch(from, to);
 
             const [totalDoctors, totalPets, totalOwners, totalRevenueResult] = await Promise.all([
-                Doctor.countDocuments(),
-                Pet.countDocuments(),
-                User.countDocuments({ role: 'owner' }),
-                Appointment.aggregate([
+                this._doctorRepository.countDocuments(),
+                this._petRepository.countDocuments(),
+                this._userRepository.countDocuments({ role: UserRole.OWNER }),
+                this._appointmentRepository.aggregate([
                     { $match: { status: AppointmentStatus.COMPLETED, paymentStatus: 'PAID', ...dateMatch } },
                     { $group: { _id: null, total: { $sum: "$totalAmount" } } }
-                ])
+                ]) as Promise<{ total: number }[]>
             ]);
+
+            // console.log('[AdminAnalyticsService] Counts:', { totalDoctors, totalPets, totalOwners, totalRevenueResult });
 
             const totalRevenue = totalRevenueResult.length > 0 ? totalRevenueResult[0].total : 0;
 
             // Define grouping logic for graph
-            let idConfig: any = {};
+            let idConfig: Record<string, unknown> = {};
             let labelFormat: string = '';
 
             switch (grouping) {
@@ -72,31 +134,15 @@ export class AdminAnalyticsService implements IAdminAnalyticsService {
                     break;
             }
 
-            const stats = await Appointment.aggregate([
+            const stats = await this._appointmentRepository.getRevenueStats(
                 {
-                    $match: {
-                        status: { $ne: 'cancelled' },
-                        ...dateMatch
-                    }
+                    status: { $ne: 'cancelled' },
+                    paymentStatus: 'PAID',
+                    ...dateMatch
                 },
-                {
-                    $group: {
-                        _id: idConfig,
-                        revenue: { $sum: "$totalAmount" },
-                        appointments: { $sum: 1 },
-                        date: { $first: "$appointmentDate" }
-                    }
-                },
-                { $sort: { "date": 1 } },
-                {
-                    $project: {
-                        _id: 0,
-                        label: { $dateToString: { format: labelFormat, date: "$date" } },
-                        revenue: 1,
-                        appointments: 1
-                    }
-                }
-            ]);
+                idConfig,
+                labelFormat
+            ) as { label: string; revenue: number; appointments: number }[];
 
             const graphData = {
                 labels: stats.map(s => s.label),
@@ -108,123 +154,64 @@ export class AdminAnalyticsService implements IAdminAnalyticsService {
                 cards: { totalDoctors, totalPets, totalOwners, totalRevenue },
                 graphData
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error in AdminAnalyticsService.getDashboardStats:', error);
             throw error;
         }
     }
 
-    async getReportsData(filters: any): Promise<any> {
-        const { from, to, specialtyId, search } = filters;
-        const match: any = {
+    async getReportsData(filters: { from?: string; to?: string; specialtyId?: string; search?: string; page?: number; limit?: number }): Promise<{ reports: ReportItem[], total: number }> {
+        const { from, to, specialtyId, search, page = 1, limit = 10 } = filters;
+        const skip = (page - 1) * limit;
+        const dateMatch = this._buildDateMatch(from, to);
+        const match: Record<string, unknown> = {
             status: AppointmentStatus.COMPLETED,
-            paymentStatus: 'PAID'
+            paymentStatus: 'PAID',
+            ...dateMatch
         };
 
-        if (from || to) {
-            match.appointmentDate = {};
-            if (from && from.trim() !== "") {
-                const fromDate = new Date(from);
-                if (!isNaN(fromDate.getTime())) match.appointmentDate.$gte = fromDate;
-            }
-            if (to && to.trim() !== "") {
-                const toDate = new Date(to);
-                if (!isNaN(toDate.getTime())) match.appointmentDate.$lte = toDate;
-            }
-            if (Object.keys(match.appointmentDate).length === 0) delete match.appointmentDate;
-        }
+        const result = await this._appointmentRepository.getReportsData(match, search, specialtyId, skip, limit) as {
+            data: {
+                _id: string;
+                user: { username: string; email: string; phone: string; profilePic: string; createdAt: Date };
+                specialty?: { name: string };
+                totalEarned: number;
+                noOfAppointments: number;
+            }[],
+            total: number
+        };
 
-        const aggregation: any[] = [
-            { $match: match },
-            {
-                $group: {
-                    _id: "$doctorId",
-                    noOfAppointments: { $sum: 1 },
-                    totalEarned: { $sum: "$totalAmount" }
-                }
-            },
-            {
-                $lookup: {
-                    from: 'doctors',
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'doctor'
-                }
-            },
-            { $unwind: "$doctor" },
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'doctor.userId',
-                    foreignField: '_id',
-                    as: 'user'
-                }
-            },
-            { $unwind: "$user" },
-            {
-                $lookup: {
-                    from: 'specialties',
-                    localField: 'doctor.profile.specialtyId',
-                    foreignField: '_id',
-                    as: 'specialty'
-                }
-            },
-            { $unwind: { path: "$specialty", preserveNullAndEmptyArrays: true } }
-        ];
-
-        if (specialtyId && mongoose.Types.ObjectId.isValid(specialtyId)) {
-            aggregation.push({ $match: { "doctor.profile.specialtyId": new mongoose.Types.ObjectId(specialtyId) } });
-        }
-
-        if (search) {
-            aggregation.push({
-                $match: {
-                    $or: [
-                        { "user.username": { $regex: search, $options: 'i' } },
-                        { "specialty.name": { $regex: search, $options: 'i' } }
-                    ]
-                }
-            });
-        }
-
-        const reports = await Appointment.aggregate(aggregation);
-
-        return reports.map((r, i) => ({
-            sNo: i + 1,
+        const reports = result.data.map((r, i) => ({
+            sNo: skip + i + 1,
             doctorId: r._id,
             doctorName: r.user.username,
+            email: r.user.email,
+            phone: r.user.phone,
             profilePic: r.user.profilePic,
             specialty: r.specialty?.name || 'General',
             memberSince: r.user.createdAt,
             earned: r.totalEarned,
             noOfAppointments: r.noOfAppointments
         }));
+
+        return { reports, total: result.total };
     }
 
-    async getSpecialtyStats(filters: any): Promise<any> {
+    async getSpecialtyStats(filters: { from?: string; to?: string }): Promise<SpecialtyStat[]> {
         const { from, to } = filters;
-        const match: any = { status: AppointmentStatus.COMPLETED };
-
-        if (from || to) {
-            match.appointmentDate = {};
-            if (from && from.trim() !== "") {
-                const fromDate = new Date(from);
-                if (!isNaN(fromDate.getTime())) match.appointmentDate.$gte = fromDate;
-            }
-            if (to && to.trim() !== "") {
-                const toDate = new Date(to);
-                if (!isNaN(toDate.getTime())) match.appointmentDate.$lte = toDate;
-            }
-            if (Object.keys(match.appointmentDate).length === 0) delete match.appointmentDate;
-        }
+        const dateMatch = this._buildDateMatch(from, to);
+        const match: Record<string, unknown> = { 
+            status: AppointmentStatus.COMPLETED,
+            ...dateMatch
+        };
 
         // Get all specialties
-        const specialties = await Specialty.find();
+        const specialties = await this._specialtyRepository.findAll();
         const stats = await Promise.all(specialties.map(async (spec) => {
-            const doctors = await Doctor.find({ "profile.specialtyId": spec._id }).select('_id');
-            const doctorIds = doctors.map(d => d._id);
+            const doctors = await this._doctorRepository.findAll({ "profile.specialtyId": spec._id });
+            const doctorIds = doctors.map(d => (d as unknown as { _id: string })._id);
 
-            const appointments = await Appointment.aggregate([
+            const appointments = await this._appointmentRepository.aggregate([
                 { $match: { ...match, doctorId: { $in: doctorIds } } },
                 {
                     $group: {
@@ -233,7 +220,7 @@ export class AdminAnalyticsService implements IAdminAnalyticsService {
                         revenue: { $sum: "$totalAmount" }
                     }
                 }
-            ]);
+            ]) as { count: number; revenue: number }[];
 
             return {
                 specialtyName: spec.name,

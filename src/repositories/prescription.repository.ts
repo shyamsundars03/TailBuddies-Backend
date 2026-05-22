@@ -27,4 +27,14 @@ export class PrescriptionRepository extends BaseRepository<IPrescription> implem
             .populate('petId')
             .exec();
     }
+
+    async findOne(query: any): Promise<IPrescription | null> {
+        return await this._model.findOne(query)
+            .populate({
+                path: 'vetId',
+                populate: { path: 'userId' }
+            })
+            .populate('petId')
+            .exec();
+    }
 }

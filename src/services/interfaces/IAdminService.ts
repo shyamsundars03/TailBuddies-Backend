@@ -1,18 +1,24 @@
-import { AdminLoginDto, AdminLoginResponseDto } from '../admin/admin.service';
+import { AdminLoginDto, AdminLoginResponseDto } from '../../dto/admin/admin-login.dto';
 import { ISpecialty } from '../../models/specialty.model';
 import { IUser } from '../../models/user.models';
+import { 
+    GetSpecialtiesInput, 
+    GetUsersInput, 
+    CreateSpecialtyInput, 
+    UpdateSpecialtyInput 
+} from '../../dto/admin/admin.schema';
 
 export interface IAdminService {
     adminLogin(data: AdminLoginDto): Promise<AdminLoginResponseDto>;
 
     // Specialty Management
-    createSpecialty(data: Partial<ISpecialty>): Promise<ISpecialty>;
-    getSpecialties(page: number, limit: number, search?: string): Promise<{ specialties: ISpecialty[], total: number }>;
-    updateSpecialty(id: string, data: Partial<ISpecialty>): Promise<ISpecialty | null>;
+    createSpecialty(data: CreateSpecialtyInput): Promise<ISpecialty>;
+    getSpecialties(data: GetSpecialtiesInput): Promise<{ specialties: ISpecialty[], total: number }>;
+    updateSpecialty(id: string, data: UpdateSpecialtyInput): Promise<ISpecialty | null>;
     deleteSpecialty(id: string): Promise<boolean>;
 
     // User Management
-    getUsers(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number }>;
-    getUsersWithDetails(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number, ownerCount: number, doctorCount: number }>;
+    getUsers(data: GetUsersInput): Promise<{ users: IUser[], total: number }>;
+    getUsersWithDetails(data: GetUsersInput): Promise<{ users: Array<IUser & { id: string, specialty?: string }>, total: number, ownerCount: number, doctorCount: number }>;
     toggleUserBlock(id: string): Promise<IUser | null>;
 }

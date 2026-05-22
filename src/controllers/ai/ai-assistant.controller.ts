@@ -1,38 +1,31 @@
-import { Request, Response } from "express";
-import { AiAssistantService } from "../../services/ai/ai-assistant.service";
+import { Response } from 'express';
+import { IAiAssistantService } from '../../services/interfaces/IAiAssistantService';
+import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
+import { ApiResponse } from '../../utils/api-response';
+import { HttpStatus } from '../../constants';
+import { UnauthorizedError } from '../../errors/app-error';
+import { AnalyzeIssueInput } from '../../dto/ai/ai.schema';
 
 export class AiAssistantController {
-    constructor(private aiAssistantService: AiAssistantService) {}
+    private readonly _aiAssistantService: IAiAssistantService;
 
-    async analyze(req: Request, res: Response) {
-        try {
-            const { category, petId, description } = req.body;
-            const userId = (req as any).user.userId;
-
-            if (!category || !petId || !description) {
-                return res.status(400).json({ 
-                    success: false, 
-                    message: "Category, petId, and description are required." 
-                });
-            }
-
-            const results = await this.aiAssistantService.analyzeIssue(
-                userId,
-                category,
-                petId,
-                description
-            );
-
-            return res.status(200).json({
-                success: true,
-                data: results
-            });
-        } catch (error: any) {
-            console.error("AI Analysis Error:", error);
-            return res.status(500).json({
-                success: false,
-                message: error.message || "An error occurred during AI analysis."
-            });
-        }
+    constructor(aiAssistantService: IAiAssistantService) {
+        this._aiAssistantService = aiAssistantService;
     }
+
+    analyze = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const { category, petId, description } = req.body as AnalyzeIssueInput;
+
+        const results = await this._aiAssistantService.analyzeIssue(
+            userId,
+            category,
+            petId,
+            description
+        );
+
+        res.status(HttpStatus.OK).json(ApiResponse.success('AI analysis completed', results));
+    };
 }

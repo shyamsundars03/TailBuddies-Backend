@@ -1,24 +1,36 @@
 import { IAppointment } from '../../models/appointment.model';
 import { AppointmentStatus } from '../../enums/appointment-status.enum';
 import { ISlot } from '../../models/slot.model';
+import { CreateAppointmentServiceInput } from '../../dto/appointment/appointment.schema';
+import { DoctorAppointmentStatsDto, OwnerAppointmentStatsDto } from '../../dto/appointment/appointment-stats.dto';
+import { ClientSession } from 'mongoose';
+import { DoctorCalendarSlot, DoctorPatientListItem } from '../../types/appointment-service.types';
+
+export interface AppointmentListResult {
+    appointments: IAppointment[];
+    total: number;
+}
+
+export interface PatientListResult {
+    patients: DoctorPatientListItem[];
+    total: number;
+}
 
 export interface IAppointmentService {
-    createAppointment(data: any): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
-    getAppointmentsByOwner(ownerId: string, page: number, limit: number, search?: string, status?: string, timeframe?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }>;
-    getAppointmentsByDoctor(doctorId: string, status?: string, page?: number, limit?: number, search?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }>;
-    getAllAppointments(page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; data?: IAppointment[]; total?: number; message?: string }>;
-    updateAppointmentStatus(appointmentId: string, status: AppointmentStatus, userId: string): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
-    cancelAppointment(appointmentId: string, userId: string, reason: string, session?: any): Promise<{ success: boolean; message: string }>;
-    getAvailableSlots(doctorId: string, date: Date): Promise<{ success: boolean; data?: ISlot[]; message?: string }>;
-    getAppointmentById(id: string): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
-    checkIn(appointmentId: string, role: 'owner' | 'doctor'): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
-    checkOut(appointmentId: string, role: 'owner' | 'doctor'): Promise<{ success: boolean; data?: IAppointment; message?: string }>;
-    getPatientsByDoctor(doctorId: string, page: number, limit: number, search?: string, species?: string, date?: string): Promise<{ success: boolean; data?: any[]; total?: number; message?: string }>;
-    getDoctorStats(doctorId: string): Promise<{ success: boolean; stats?: any; message?: string }>;
-    getOwnerStats(ownerId: string): Promise<{ success: boolean; stats?: any; message?: string }>;
-    cancelPendingAppointment(appointmentId: string): Promise<{ success: boolean; message?: string }>;
-    checkSlotAvailability(appointmentId: string): Promise<{ success: boolean; available: boolean; message?: string }>;
-    getAllSlotsForDoctor(userId: string, date: any): Promise<{ success: boolean; data?: any[]; message?: string }>;
+    createAppointment(data: CreateAppointmentServiceInput): Promise<IAppointment>;
+    getAppointmentsByOwner(ownerId: string, page: number, limit: number, search?: string, status?: string, timeframe?: string, pet?: string): Promise<AppointmentListResult>;
+    getAppointmentsByDoctor(doctorId: string, status?: string, page?: number, limit?: number, search?: string): Promise<AppointmentListResult>;
+    getAllAppointments(page: number, limit: number, search?: string, status?: string): Promise<AppointmentListResult>;
+    updateAppointmentStatus(appointmentId: string, status: AppointmentStatus, userId: string): Promise<IAppointment>;
+    cancelAppointment(appointmentId: string, userId: string, reason: string, session?: ClientSession): Promise<void>;
+    getAvailableSlots(doctorId: string, date: Date | string): Promise<ISlot[]>;
+    getAppointmentById(id: string): Promise<IAppointment>;
+    checkIn(appointmentId: string, role: 'owner' | 'doctor'): Promise<IAppointment>;
+    checkOut(appointmentId: string, role: 'owner' | 'doctor'): Promise<IAppointment>;
+    getPatientsByDoctor(doctorId: string, page: number, limit: number, search?: string, species?: string, date?: string): Promise<PatientListResult>;
+    getDoctorStats(doctorId: string): Promise<DoctorAppointmentStatsDto>;
+    getOwnerStats(ownerId: string): Promise<OwnerAppointmentStatsDto>;
+    cancelPendingAppointment(appointmentId: string): Promise<IAppointment>;
+    checkSlotAvailability(appointmentId: string): Promise<boolean>;
+    getAllSlotsForDoctor(userId: string, date: string): Promise<DoctorCalendarSlot[]>;
 }
-// sendMessage(appointmentId: string, senderId: string, senderRole: 'owner' | 'doctor', message: string): Promise<{ success: boolean; data?: any; message?: string }>;
-// }

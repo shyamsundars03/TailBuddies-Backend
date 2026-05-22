@@ -2,8 +2,11 @@ import Groq from "groq-sdk";
 import { IPetRepository } from "../../repositories/interfaces/IPetRepository";
 import { IDoctorRepository } from "../../repositories/interfaces/IDoctorRepository";
 import { ISpecialtyRepository } from "../../repositories/interfaces/ISpecialtyRepository";
+import { IDoctor } from "../../models/doctor.model";
+import { extractId } from "../../utils/mongoose-id.util";
+import { IAiAssistantService, AiAnalysisResult } from "../interfaces/IAiAssistantService";
 
-export class AiAssistantService {
+export class AiAssistantService implements IAiAssistantService {
     private groq: Groq;
     private model: string = "llama-3.3-70b-versatile";
 
@@ -17,22 +20,20 @@ export class AiAssistantService {
         });
     }
 
-    async analyzeIssue(userId: string, category: string, petId: string, description: string) {
+    async analyzeIssue(userId: string, category: string, petId: string, description: string): Promise<AiAnalysisResult> {
         // 1. Validate Pet & Owner
         const pet = await this.petRepository.findById(petId);
         if (!pet) throw new Error("Pet not found");
         
-        const petOwnerId = pet.ownerId && (pet.ownerId as any)._id 
-            ? (pet.ownerId as any)._id.toString() 
-            : pet.ownerId.toString();
+        const petOwnerId = extractId(pet.ownerId);
 
         if (petOwnerId !== userId) {
             throw new Error("Unauthorized access to this pet");
         }
 
         // 2. Fetch Available Specialties for Context
-        const availableSpecialties = await (this.specialtyRepository as any).findAll();
-        const specialtyNames = (availableSpecialties as any[]).map(s => s.name).join(', ');
+        const availableSpecialties = await this.specialtyRepository.findAll();
+        const specialtyNames = availableSpecialties.map(s => s.name).join(', ');
 
         // 3. Prepare Prompt
         const prompt = `You are an expert AI Veterinary Assistant for TailBuddies. 
@@ -71,7 +72,7 @@ export class AiAssistantService {
         const carePlan = planMatch ? planMatch.trim() : content;
 
         // 4. Find matching Specialty ID & Doctors
-        let doctors: any[] = [];
+        let doctors: IDoctor[] = [];
         const specialtyDoc = await this.specialtyRepository.findByName(specialtyName);
         
         if (specialtyDoc) {

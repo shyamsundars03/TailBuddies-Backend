@@ -4,8 +4,7 @@ import cookieParser from 'cookie-parser';
 // import mongoose from 'mongoose';
 import { env } from './config/env';
 import logger from './logger';
-import { HttpStatus, ErrorMessages } from './constants';
-import { Request, Response, NextFunction } from 'express';
+import { HttpStatus } from './constants';
 import routes from './routes';
 import authRoutes from './routes/auth.routes';
 import adminRoutes from './routes/admin.routes';
@@ -18,7 +17,7 @@ import chatRoutes from './routes/chat.routes';
 import agoraRoutes from './routes/agora.routes';
 import notificationRoutes from './routes/notification.routes';
 import slotRoutes from './routes/slot.routes';
-
+import { errorHandler } from './middleware/error-handler.middleware';
 
 
 const app = express();
@@ -80,35 +79,9 @@ app.use((req, res) => {
 
 
 
-// Error handler
-app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
-  // Type-narrow 
-  const errObj = err as Record<string, unknown>;
-  const statusCode = (typeof errObj.statusCode === 'number' ? errObj.statusCode : null) || HttpStatus.INTERNAL_SERVER_ERROR;
-  const message = (typeof errObj.message === 'string' ? errObj.message : null) || ErrorMessages.INTERNAL_SERVER;
-  const stack = typeof errObj.stack === 'string' ? errObj.stack : undefined;
-
-  if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
-    logger.error('Unhandled server error:', {
-      message,
-      stack,
-      path: req.path
-    });
-  } else {
-    logger.warn('Business/Validation error:', {
-      statusCode,
-      message,
-      path: req.path
-    });
-  }
-
-  res.status(statusCode).json({
-    success: false,
-    message,
-    ...(process.env.NODE_ENV === 'development' && { stack })
-  });
-});
+// Global Error handler
+app.use(errorHandler);
 
 
 
-export default app;
+export default app;

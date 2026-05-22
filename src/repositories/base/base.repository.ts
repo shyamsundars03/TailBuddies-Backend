@@ -34,6 +34,18 @@ export abstract class BaseRepository<T extends Document> implements IBaseReposit
     return await this._model.find(filter, null, options);
   }
 
+  async findWithPagination(filter: FilterQuery<T> = {}, page: number, limit: number, sort: Record<string, number> = { createdAt: -1 }): Promise<{ items: T[], total: number }> {
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      this._model.find(filter)
+        .sort(sort as any)
+        .skip(skip)
+        .limit(limit),
+      this._model.countDocuments(filter)
+    ]);
+    return { items, total };
+  }
+
   async update(id: string, data: Partial<T>): Promise<T | null> {
     return await this._model.findByIdAndUpdate(id, data, { new: true });
   }

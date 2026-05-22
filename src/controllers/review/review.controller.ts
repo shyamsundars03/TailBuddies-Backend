@@ -1,241 +1,145 @@
-import { Response, NextFunction } from 'express';
-import { ReviewService } from '../../services/review.service';
+import { Response } from 'express';
+import { IReviewService } from '../../services/interfaces/IReviewService';
 import { HttpStatus } from '../../constants';
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
+import { ApiResponse } from '../../utils/api-response';
+import {
+    CreateReviewInput,
+    UpdateReviewInput,
+    ReplyInput,
+} from '../../dto/review/review.schema';
+import { UnauthorizedError } from '../../errors/app-error';
 
 export class ReviewController {
-    constructor(private reviewService: ReviewService) {}
+    constructor(private readonly _reviewService: IReviewService) {}
 
-    create = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const review = await this.reviewService.createReview(userId, req.body);
-            res.status(HttpStatus.CREATED).json({
-                success: true,
-                message: 'Review created successfully',
-                data: review
-            });
-        } catch (error: any) {
-            next(error);
-        }
+    create = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const review = await this._reviewService.createReview(userId, req.body as CreateReviewInput);
+        res.status(HttpStatus.CREATED).json(ApiResponse.success('Review created successfully', review));
     };
 
-    update = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const review = await this.reviewService.updateReview(userId, req.params.id as string, req.body);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: 'Review updated successfully',
-                data: review
-            });
-        } catch (error: any) {
-            next(error);
-        }
+    update = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const review = await this._reviewService.updateReview(userId, req.params.id as string, req.body as UpdateReviewInput);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Review updated successfully', review));
     };
 
-    delete = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            const role = req.user?.role;
-            if (!userId || !role) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            await this.reviewService.deleteReview(userId, role, req.params.id as string);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: 'Review deleted successfully'
-            });
-        } catch (error: any) {
-            next(error);
-        }
+    delete = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        const role = req.user?.role;
+        if (!userId || !role) throw new UnauthorizedError();
+
+        await this._reviewService.deleteReview(userId, role, req.params.id as string);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Review deleted successfully'));
     };
 
-    reply = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const review = await this.reviewService.replyToReview(userId, req.params.id as string, req.body.comment);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: 'Reply added successfully',
-                data: review
-            });
-        } catch (error: any) {
-            next(error);
-        }
+    reply = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const { comment } = req.body as ReplyInput;
+        const review = await this._reviewService.replyToReview(userId, req.params.id as string, comment);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Reply added successfully', review));
     };
 
-    updateReply = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const review = await this.reviewService.updateReply(userId, req.params.id as string, req.body.comment);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: 'Reply updated successfully',
-                data: review
-            });
-        } catch (error: any) {
-            next(error);
-        }
+    updateReply = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const { comment } = req.body as ReplyInput;
+        const review = await this._reviewService.updateReply(userId, req.params.id as string, comment);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Reply updated successfully', review));
     };
 
-    deleteReply = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            const role = req.user?.role;
-            if (!userId || !role) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const review = await this.reviewService.deleteReply(userId, role, req.params.id as string);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: 'Reply deleted successfully',
-                data: review
-            });
-        } catch (error: any) {
-            next(error);
-        }
+    deleteReply = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        const role = req.user?.role;
+        if (!userId || !role) throw new UnauthorizedError();
+
+        const review = await this._reviewService.deleteReply(userId, role, req.params.id as string);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Reply deleted successfully', review));
     };
 
-    getDoctorReviews = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 4;
-            const search = req.query.search as string;
+    getDoctorReviews = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
 
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const data = await this.reviewService.getReviewsByDoctorUserId(userId, page, limit, search);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                data: data.reviews,
-                total: data.total,
-                page,
-                limit
-            });
-        } catch (error: any) {
-            next(error);
-        }
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 4;
+        const search = req.query.search as string | undefined;
+
+        const data = await this._reviewService.getReviewsByDoctorUserId(userId, page, limit, search);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Doctor reviews fetched', {
+            items: data.reviews,
+            total: data.total,
+            page,
+            limit,
+        }));
     };
 
-    getOwnerReviews = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 4;
-            const search = req.query.search as string;
+    getOwnerReviews = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
 
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const data = await this.reviewService.getReviewsByOwner(userId, page, limit, search);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                data: data.reviews,
-                total: data.total,
-                page,
-                limit
-            });
-        } catch (error: any) {
-            next(error);
-        }
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 4;
+        const search = req.query.search as string | undefined;
+
+        const data = await this._reviewService.getReviewsByOwner(userId, page, limit, search);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Owner reviews fetched', {
+            items: data.reviews,
+            total: data.total,
+            page,
+            limit,
+        }));
     };
 
-    getAllReviews = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 4;
-            const search = req.query.search as string;
+    getAllReviews = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 4;
+        const search = req.query.search as string | undefined;
 
-            const data = await this.reviewService.getAllReviews(page, limit, search);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                data: data.reviews,
-                total: data.total,
-                page,
-                limit
-            });
-        } catch (error: any) {
-            next(error);
-        }
+        const data = await this._reviewService.getAllReviews(page, limit, search);
+        res.status(HttpStatus.OK).json(ApiResponse.success('All reviews fetched', {
+            items: data.reviews,
+            total: data.total,
+            page,
+            limit,
+        }));
     };
 
-    getById = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const review = await this.reviewService.getReviewById(req.params.id as string);
-            if (!review) {
-                res.status(HttpStatus.NOT_FOUND).json({ success: false, message: 'Review not found' });
-                return;
-            }
-            res.status(HttpStatus.OK).json({
-                success: true,
-                data: review
-            });
-        } catch (error: any) {
-            next(error);
-        }
+    getById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const review = await this._reviewService.getReviewById(req.params.id as string);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Review details fetched', review));
     };
 
-    getByAppointment = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const review = await this.reviewService.getReviewByAppointment(req.params.appointmentId as string);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                data: review
-            });
-        } catch (error: any) {
-            next(error);
-        }
+    getByAppointment = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const review = await this._reviewService.getReviewByAppointment(req.params.appointmentId as string);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Review fetched by appointment', review));
     };
 
-    getByDoctorId = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const doctorId = req.params.doctorId as string;
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 10;
-            const search = req.query.search as string;
+    getByDoctorId = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const doctorId = req.params.doctorId as string;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const search = req.query.search as string | undefined;
 
-            const data = await this.reviewService.getReviewsByDoctor(doctorId, page, limit, search);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                data: data.reviews,
-                total: data.total,
-                page,
-                limit
-            });
-        } catch (error: any) {
-            next(error);
-        }
+        const data = await this._reviewService.getReviewsByDoctor(doctorId, page, limit, search);
+        res.status(HttpStatus.OK).json(ApiResponse.success('Doctor reviews fetched', {
+            items: data.reviews,
+            total: data.total,
+            page,
+            limit,
+        }));
     };
 
-    recalculateRatings = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const result = await this.reviewService.recalculateAllDoctorRatings();
-            res.status(HttpStatus.OK).json(result);
-        } catch (error: any) {
-            next(error);
-        }
+    recalculateRatings = async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const result = await this._reviewService.recalculateAllDoctorRatings();
+        res.status(HttpStatus.OK).json(ApiResponse.success('Ratings recalculated', result));
     };
 }

@@ -1,4 +1,3 @@
-import { IPayment } from '../../models/payment.model';
 import { IWallet } from '../../models/wallet.model';
 import { IWalletTransaction } from '../../models/wallet-transaction.model';
 import { ClientSession } from 'mongoose';
@@ -20,31 +19,31 @@ export interface PaymentVerificationData {
 
 export interface IPaymentService {
     // Razorpay logic
-    createRazorpayOrder(amount: number, appointmentId: string, userId: string): Promise<{ success: boolean; order?: any; message?: string }>;
-    verifyRazorpaySignature(verificationData: PaymentVerificationData): Promise<{ success: boolean; message: string }>;
+    createRazorpayOrder(amount: number, appointmentId: string, userId: string): Promise<{ order: RazorpayOrderResponse }>;
+    verifyRazorpaySignature(verificationData: PaymentVerificationData): Promise<void>;
 
     // Wallet logic
-    getWallet(userId: string): Promise<{ success: boolean; wallet?: IWallet; message?: string }>;
-    processWalletPayment(userId: string, amount: number, appointmentId: string): Promise<{ success: boolean; message: string }>;
-    topUpWallet(userId: string, amount: number, transactionId: string): Promise<{ success: boolean; message: string }>;
+    getWallet(userId: string): Promise<IWallet>;
+    processWalletPayment(userId: string, amount: number, appointmentId: string): Promise<void>;
+    topUpWallet(userId: string, amount: number, transactionId: string): Promise<void>;
 
     // Cash balance and general
-    processCashPayment(appointmentId: string, userId: string): Promise<{ success: boolean; message: string }>;
-    getTransactions(userId: string, page: number, limit: number): Promise<{ success: boolean; transactions?: IWalletTransaction[]; total?: number; message?: string }>;
+    processCashPayment(appointmentId: string, userId: string): Promise<void>;
+    getTransactions(userId: string, page: number, limit: number): Promise<{ transactions: IWalletTransaction[]; total: number }>;
 
     // Retry logic
-    retryPayment(appointmentId: string, method: string): Promise<{ success: boolean; order?: any; message?: string }>;
+    retryPayment(appointmentId: string, method: string): Promise<{ order: RazorpayOrderResponse } | Record<string, unknown>>;
 
     // Refund logic
-    refund(appointmentId: string, reason: string, session?: ClientSession): Promise<{ success: boolean; message: string }>;
+    refund(appointmentId: string, reason: string, session?: ClientSession): Promise<void>;
 
     // Admin operations
-    getAllTransactions(page: number, limit: number, search?: string, status?: string): Promise<{ success: boolean; transactions?: IWalletTransaction[]; total?: number; message?: string }>;
-    getTransactionDetail(id: string): Promise<{ success: boolean; transaction?: IWalletTransaction; message?: string }>;
+    getAllTransactions(page: number, limit: number, search?: string, status?: string): Promise<{ transactions: IWalletTransaction[]; total: number }>;
+    getTransactionDetail(id: string): Promise<IWalletTransaction>;
 
     // Doctor specific
-    creditDoctorWallet(userId: string, amount: number, appointmentId: string, humanReadableId: string): Promise<{ success: boolean; message: string }>;
-    requestWithdrawal(userId: string, amount: number): Promise<{ success: boolean; message: string }>;
-    approveWithdrawal(transactionId: string): Promise<{ success: boolean; message: string }>;
-    rejectWithdrawal(transactionId: string): Promise<{ success: boolean; message: string }>;
+    creditDoctorWallet(userId: string, amount: number, appointmentId: string, humanReadableId: string): Promise<void>;
+    requestWithdrawal(userId: string, amount: number): Promise<void>;
+    approveWithdrawal(transactionId: string): Promise<void>;
+    rejectWithdrawal(transactionId: string): Promise<void>;
 }

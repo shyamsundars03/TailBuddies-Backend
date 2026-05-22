@@ -11,7 +11,7 @@ export class PaymentRepository implements IPaymentRepository {
     }
 
     async updatePaymentStatus(paymentID: string, status: string, transactionID?: string, session?: ClientSession): Promise<IPayment | null> {
-        const update: any = { paymentStatus: status };
+        const update: Record<string, unknown> = { paymentStatus: status };
         if (transactionID) update.transactionID = transactionID;
         return await Payment.findOneAndUpdate({ paymentID }, update, { new: true, session });
     }
@@ -58,7 +58,7 @@ export class PaymentRepository implements IPaymentRepository {
 
     async findAllWalletTransactions(page: number, limit: number, search?: string, status?: string): Promise<{ transactions: IWalletTransaction[], total: number }> {
         const skip = (page - 1) * limit;
-        const query: any = {};
+        const query: Record<string, unknown> = {};
 
         if (status) {
             if (status.toLowerCase() === 'paid') {
@@ -78,12 +78,12 @@ export class PaymentRepository implements IPaymentRepository {
 
             // Find wallets for those users
             const wallets = await WalletTransaction.db.model('Wallet').find({
-                userId: { $in: users.map((u: any) => u._id) }
+                userId: { $in: users.map((u: { _id: string }) => u._id) }
             }).select('_id');
 
             query.$or = [
                 { transactionID: { $regex: search, $options: 'i' } },
-                { walletID: { $in: wallets.map((w: any) => w._id) } }
+                { walletID: { $in: wallets.map((w: { _id: string }) => w._id) } }
             ];
         }
 

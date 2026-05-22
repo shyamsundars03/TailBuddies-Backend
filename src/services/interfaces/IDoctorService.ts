@@ -1,12 +1,13 @@
 import { IDoctor } from '../../models/doctor.model';
-import { UpdateDoctorProfileDto, VerifyDoctorDto } from '../../dto/doctor.dto';
+import { ISpecialty } from '../../models/specialty.model';
+import { UpdateDoctorProfileInput, VerifyDoctorInput } from '../../dto/doctor/doctor.schema';
 
 export interface IDoctorService {
     getDoctorProfile(userId: string): Promise<IDoctor | null>;
     getDoctorById(doctorId: string): Promise<IDoctor | null>;
-    updateDoctorProfile(userId: string, data: UpdateDoctorProfileDto): Promise<IDoctor>;
-    verifyDoctor(doctorId: string, data: VerifyDoctorDto): Promise<IDoctor>;
+    updateDoctorProfile(userId: string, data: UpdateDoctorProfileInput): Promise<IDoctor>;
+    verifyDoctor(doctorId: string, data: VerifyDoctorInput): Promise<IDoctor>;
     requestVerification(userId: string): Promise<IDoctor>;
-    getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string, filters?: any, sortBy?: string): Promise<{ doctors: IDoctor[], total: number }>;
-    getSpecialties(): Promise<any[]>;
+    getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string, filters?: Record<string, unknown>, sortBy?: string): Promise<{ doctors: IDoctor[], total: number }>;
+    getSpecialties(): Promise<ISpecialty[]>;
 }

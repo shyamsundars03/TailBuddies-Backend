@@ -1,49 +1,55 @@
 import { IUserRepository } from '../../repositories/interfaces/IUserRepository';
 import { IOtpRepository } from '../../repositories/interfaces/IOtpRepository';
-import { RegisterDto, RegisterResponseDto } from '../../dto/auth/register.dto';
-import { LoginDto, LoginResponseDto } from '../../dto/auth/login.dto';
+import { RegisterResponseDto } from '../../dto/auth/register.dto';
+import { LoginResponseDto } from '../../dto/auth/login.dto';
 import { IAuthService } from '../interfaces/IAuthService';
 import { IJwtService } from '../interfaces/IJwtService';
 import { IEmailService } from '../interfaces/IEmailService';
+import { IAdminRepository } from '../../repositories/interfaces/IAdminRepository';
+import { 
+    VerifyOtpInput, 
+    LoginInput, 
+    RegisterInput, 
+    ResendOtpInput, 
+    ResetPasswordInput, 
+    ChangePasswordInput, 
+    GoogleLoginInput,
+    ForgotPasswordSchema
+} from '../../dto/auth/auth.schema';
 import { UserRole } from '../../enums/user-role.enum';
 import { Gender } from '../../enums/gender.enum';
-import { AppError } from '../../errors/app-error';
-
-
-import { HttpStatus, ErrorMessages } from '../../constants';
+import { ErrorMessages, HttpStatus } from '../../constants';
+import { AppError, UnauthorizedError, ConflictError, NotFoundError, ForbiddenError, ValidationError } from '../../errors/app-error';
+import { UserMapper } from '../../utils/user.mapper';
+import { z } from 'zod';
 import logger from '../../logger';
-
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { User, IUser } from '../../models/user.models';
-import Admin from '../../models/admin.model';
+import { IUser } from '../../models/user.models';
 
-
-
-
+type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
 
 export class AuthService implements IAuthService {
   private readonly _userRepository: IUserRepository;
   private readonly _otpRepository: IOtpRepository;
+  private readonly _adminRepository: IAdminRepository;
   private readonly _jwtService: IJwtService;
   private readonly _emailService: IEmailService;
 
   constructor(
     userRepository: IUserRepository,
     otpRepository: IOtpRepository,
+    adminRepository: IAdminRepository,
     jwtService: IJwtService,
     emailService: IEmailService
   ) {
     this._userRepository = userRepository;
     this._otpRepository = otpRepository;
+    this._adminRepository = adminRepository;
     this._jwtService = jwtService;
     this._emailService = emailService;
   }
-
-
-
-  ///////////////////////////////////Helpers 
 
   private generateOtp(): string {
     return crypto.randomInt(100000, 999999).toString();
@@ -56,99 +62,54 @@ export class AuthService implements IAuthService {
     const sent = await this._emailService.sendOTP(email, otp);
     if (!sent) {
       logger.error('Failed to send OTP email', { email });
-      throw new Error(ErrorMessages.OTP_SEND_FAILED);
+      throw new AppError(ErrorMessages.OTP_SEND_FAILED || 'OTP sending failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
     logger.info('OTP sent', { email });
     return otp;
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-  /////////////////////////////////// Login 
-  async login(data: LoginDto): Promise<LoginResponseDto> {
-
-
-
+  async login(data: LoginInput): Promise<LoginResponseDto> {
     const { email, password, role } = data;
 
     const user = await this._userRepository.findUserWithPassword(email);
     if (!user) {
-      throw new Error(ErrorMessages.INVALID_CREDENTIALS);
+      throw new UnauthorizedError(ErrorMessages.INVALID_CREDENTIALS);
     }
 
-    // Check role mismatch
     if (role && user.role !== role) {
-      throw new Error(`Account already exists with role ${user.role}. Please sign in with correct role.`);
+      throw new ConflictError(`Account already exists with role ${user.role}. Please sign in with correct role.`);
     }
 
-    // Check blocked
     if (user.isBlocked) {
-      throw new Error(ErrorMessages.ACCOUNT_BLOCKED);
+      throw new ForbiddenError(ErrorMessages.ACCOUNT_BLOCKED);
     }
 
-    // Check verified
     if (!user.isVerified) {
-      throw new Error(ErrorMessages.ACCOUNT_NOT_VERIFIED);
+      throw new ForbiddenError(ErrorMessages.ACCOUNT_NOT_VERIFIED);
     }
 
-    //(Google users)
     if (!user.password) {
-      throw new Error('This account uses Google Sign-in. Please use the Google button.');
+      throw new UnauthorizedError('This account uses Google Sign-in. Please use the Google button.');
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      throw new Error(ErrorMessages.INVALID_CREDENTIALS);
+      throw new UnauthorizedError(ErrorMessages.INVALID_CREDENTIALS);
     }
-
-
 
     const accessToken = this._jwtService.generateAccessToken({ userId: user.id, role: user.role });
     const refreshToken = this._jwtService.generateRefreshToken({ userId: user.id });
 
     return {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      phone: user.phone,
-      gender: user.gender,
-      profilePic: user.profilePic,
+      ...UserMapper.toResponse(user),
       accessToken,
       refreshToken,
     };
-
-
-
-
-
   }
 
-
-
-
-
-
-  ////////////////////////////////// Google Login 
-
-
-
-
-  async googleLogin(idToken: string, role: string): Promise<LoginResponseDto> {
-
-
-
+  async googleLogin(data: GoogleLoginInput): Promise<LoginResponseDto> {
     try {
+      const { idToken, role } = data;
       const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
       const ticket = await client.verifyIdToken({
         idToken,
@@ -156,7 +117,7 @@ export class AuthService implements IAuthService {
       });
       const payload = ticket.getPayload();
       if (!payload || !payload.email) {
-        throw new Error(ErrorMessages.INVALID_CREDENTIALS);
+        throw new UnauthorizedError(ErrorMessages.INVALID_CREDENTIALS);
       }
 
       const { email, sub: googleId, name: username, picture: profilePic } = payload;
@@ -165,37 +126,22 @@ export class AuthService implements IAuthService {
       let user = await this._userRepository.findByEmail(email);
 
       if (user) {
-
-
-
-
         if (user.role.toLowerCase() !== targetRole) {
-          throw new Error(`Account already exists with role ${user.role}. Please sign in with correct role.`);
+          throw new ConflictError(`Account already exists with role ${user.role}. Please sign in with correct role.`);
         }
 
-        // Check blocked for existing Google user
         if (user.isBlocked) {
-          throw new Error(ErrorMessages.ACCOUNT_BLOCKED);
+          throw new ForbiddenError(ErrorMessages.ACCOUNT_BLOCKED);
         }
-
-
-
-
-
-
 
         if (!user.googleId) {
-          user.googleId = googleId;
-          if (!user.profilePic) user.profilePic = profilePic;
-          user.isVerified = true;
-          await user.save();
+          await this._userRepository.update(user.id, {
+            googleId,
+            profilePic: user.profilePic || profilePic,
+            isVerified: true
+          });
         }
-
-
-
-
       } else {
-
         user = await this._userRepository.create({
           username,
           email,
@@ -204,21 +150,13 @@ export class AuthService implements IAuthService {
           role: targetRole as UserRole,
           isVerified: true,
         } as Partial<IUser>);
-
-
       }
 
       const accessToken = this._jwtService.generateAccessToken({ userId: user.id, role: user.role });
       const refreshToken = this._jwtService.generateRefreshToken({ userId: user.id });
 
       return {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        gender: user.gender,
-        profilePic: user.profilePic,
+        ...UserMapper.toResponse(user),
         accessToken,
         refreshToken,
       };
@@ -228,306 +166,185 @@ export class AuthService implements IAuthService {
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-  /////////////////////////////////// Register 
-
-  async register(data: RegisterDto): Promise<RegisterResponseDto> {
-
-
-
-
+  async register(data: RegisterInput): Promise<RegisterResponseDto> {
     const { username, email, role } = data;
-
 
     const existingUser = await this._userRepository.findByEmail(email);
     if (existingUser) {
       if (existingUser.role !== role) {
-        throw new Error(`Account already exists with role ${existingUser.role}. Please sign in.`);
+        throw new ConflictError(`Account already exists with role ${existingUser.role}. Please sign in.`);
       }
-      throw new Error(ErrorMessages.EMAIL_EXISTS);
+      throw new ConflictError(ErrorMessages.EMAIL_EXISTS);
     }
 
-
-
     await this.sendOtpToEmail(email);
-
     logger.info('User registration pending, OTP sent', { email });
 
     return {
       id: '',
-      username: username,
-      email: email,
+      username,
+      email,
       phone: data.phone || '',
       role: data.role || '',
       isVerified: false,
     };
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-  /////////////////////////////////// Verify OTP 
-
-  async verifyOtp(email: string, otp: string, userData?: unknown, purpose?: string): Promise<LoginResponseDto> {
-
-
+  async verifyOtp(data: VerifyOtpInput): Promise<LoginResponseDto> {
+    const { email, otp, userData, purpose } = data;
 
     try {
       const otpDoc = await this._otpRepository.findOtp(email);
-      if (!otpDoc) {
-        throw new AppError(ErrorMessages.OTP_EXPIRED, HttpStatus.BAD_REQUEST);
+      if (!otpDoc || otpDoc.otp !== otp) {
+        throw new ValidationError(!otpDoc ? ErrorMessages.OTP_EXPIRED : ErrorMessages.INVALID_OTP);
       }
 
-      if (otpDoc.otp !== otp) {
-        throw new AppError(ErrorMessages.INVALID_OTP, HttpStatus.BAD_REQUEST);
-      }
-
-
-
-      let user;
+      let user: IUser | null;
       if (userData) {
-        const { username, phone, password, gender, role } = userData as RegisterDto;
-
-
-        const existingUser = await this._userRepository.findByEmail(email);
-        if (existingUser) {
-          user = existingUser;
-        } else {
-
-
-          const genderKey = gender ? (gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase()) : '';
-          const genderMap: Record<string, Gender> = {
-            'Male': Gender.MALE,
-            'Female': Gender.FEMALE,
-            'Other': Gender.OTHER
-          };
-
-
-          const targetRole = role?.toLowerCase() === 'doctor' ? UserRole.DOCTOR : UserRole.OWNER;
-
-          logger.info('Creating new user from OTP verification', { email, role: targetRole });
-
-          user = await this._userRepository.create({
-            username: username,
-            email,
-            phone,
-            password,
-            gender: genderMap[genderKey] || undefined,
-            role: targetRole,
-            isVerified: true,
-          } as Partial<IUser>);
-
-        }
+        user = await this.handleUserRegistration(email, userData as RegisterInput);
       } else {
-
-
-
-        user = await this._userRepository.findByEmail(email);
-        if (!user) {
-          throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-        }
-        user.isVerified = true;
-        await user.save();
-
+        user = await this.handleUserVerification(email);
       }
 
+      if (!user) throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
 
       if (purpose !== 'reset') {
         await this._otpRepository.deleteOtp(email);
       }
 
-
       const accessToken = this._jwtService.generateAccessToken({ userId: user.id, role: user.role });
       const refreshToken = this._jwtService.generateRefreshToken({ userId: user.id });
 
-      logger.info('User verified and created via OTP', { userId: user.id, email });
+      logger.info('User verified via OTP', { userId: user.id, email });
 
       return {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        gender: user.gender,
-        profilePic: user.profilePic,
+        ...UserMapper.toResponse(user),
         accessToken,
         refreshToken,
       };
     } catch (error) {
-      logger.error('Verify OTP Error Detail:', error);
+      logger.error('Verify OTP Error:', error);
       throw error;
     }
   }
 
+  private async handleUserRegistration(email: string, userData: RegisterInput): Promise<IUser> {
+    const existingUser = await this._userRepository.findByEmail(email);
+    if (existingUser) return existingUser;
 
-  ////////////////////////////////// Resend OTP 
+    const { username, phone, password, gender, role } = userData;
+    const genderKey = gender ? (gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase()) : '';
+    const genderMap: Record<string, Gender> = {
+      'Male': Gender.MALE,
+      'Female': Gender.FEMALE,
+      'Other': Gender.OTHER
+    };
 
-  async resendOtp(email: string): Promise<void> {
-    await this.sendOtpToEmail(email);
-    logger.info('OTP resent', { email });
+    const targetRole = role?.toLowerCase() === 'doctor' ? UserRole.DOCTOR : UserRole.OWNER;
+    
+    return await this._userRepository.create({
+      username,
+      email,
+      phone,
+      password,
+      gender: genderMap[genderKey],
+      role: targetRole,
+      isVerified: true,
+    } as Partial<IUser>);
   }
 
-
-
-
-
-
-
-
-
-
-
-  ////////////////////////////////// Forgot Password 
-
-  async forgotPassword(email: string): Promise<void> {
+  private async handleUserVerification(email: string): Promise<IUser | null> {
     const user = await this._userRepository.findByEmail(email);
-    if (!user) {
-      logger.warn('Forgot password for non-existent email', { email });
-      throw new Error(ErrorMessages.USER_NOT_FOUND);
-    }
-
-    await this.sendOtpToEmail(email);
-    logger.info('Forgot password OTP sent', { email });
+    if (!user) return null;
+    
+    return await this._userRepository.update(user.id, { isVerified: true });
   }
 
-  ////////////////////////////////// Reset Password 
+  async resendOtp(data: ResendOtpInput): Promise<void> {
+    await this.sendOtpToEmail(data.email);
+    logger.info('OTP resent', { email: data.email });
+  }
 
-  async resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
-    const otpDoc = await this._otpRepository.findOtp(email);
-    if (!otpDoc) {
-      throw new Error(ErrorMessages.OTP_EXPIRED);
-    }
-
-    if (otpDoc.otp !== otp) {
-      throw new Error(ErrorMessages.INVALID_OTP);
-    }
-
-    // Check if the new password is the same as the old one
-    // We fetch the user with the password field for comparison
-    const user = await this._userRepository.findUserWithPassword(email);
+  async forgotPassword(data: ForgotPasswordInput): Promise<void> {
+    const user = await this._userRepository.findByEmail(data.email);
     if (!user) {
-      throw new Error(ErrorMessages.USER_NOT_FOUND);
+      logger.warn('Forgot password for non-existent email', { email: data.email });
+      throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
     }
+
+    await this.sendOtpToEmail(data.email);
+    logger.info('Forgot password OTP sent', { email: data.email });
+  }
+
+  async resetPassword(data: ResetPasswordInput): Promise<void> {
+    const { email, otp, newPassword } = data;
+    const otpDoc = await this._otpRepository.findOtp(email);
+    if (!otpDoc || otpDoc.otp !== otp) {
+      throw new ValidationError(!otpDoc ? ErrorMessages.OTP_EXPIRED : ErrorMessages.INVALID_OTP);
+    }
+
+    const user = await this._userRepository.findUserWithPassword(email);
+    if (!user) throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
 
     if (user.password) {
-      const isSamePassword = await user.comparePassword(newPassword);
+      const isSamePassword = await bcrypt.compare(newPassword, user.password);
       if (isSamePassword) {
-        throw new Error('New password must be different from the current password');
+        throw new ValidationError('New password must be different from the current password');
       }
     }
 
-    user.password = newPassword;
-    await user.save();
-
+    await this._userRepository.updatePassword(user.id, newPassword);
     await this._otpRepository.deleteOtp(email);
-    logger.info('Password reset via OTP', { email });
+    logger.info('Password reset successfully', { email });
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  ////////////////////////////////// Change Password 
-
-  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+  async changePassword(userId: string, data: ChangePasswordInput): Promise<void> {
+    const { currentPassword, newPassword } = data;
     const user = await this._userRepository.findById(userId);
-    if (!user) {
-      throw new Error(ErrorMessages.USER_NOT_FOUND);
-    }
+    if (!user) throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
 
     const userWithPassword = await this._userRepository.findUserWithPassword(user.email);
     if (!userWithPassword || !userWithPassword.password) {
-      throw new Error(ErrorMessages.USER_NOT_FOUND);
+      throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
     }
 
     const isMatch = await bcrypt.compare(currentPassword, userWithPassword.password);
     if (!isMatch) {
-      throw new Error(ErrorMessages.INVALID_CURRENT_PASSWORD);
+      throw new UnauthorizedError(ErrorMessages.INVALID_CURRENT_PASSWORD);
     }
 
-    userWithPassword.password = newPassword;
-    await userWithPassword.save();
-    logger.info('Password changed', { userId });
+    await this._userRepository.updatePassword(userId, newPassword);
+    logger.info('Password changed successfully', { userId });
   }
-
-
-
-
-
-
-
-
-
-
-
-
-  ////////////////////////////////// Refresh Access Token 
 
   async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string }> {
     try {
-      const decoded = this._jwtService.verifyToken(refreshToken, process.env.JWT_REFRESH_SECRET || '') as { userId: string };
-      if (!decoded || !decoded.userId) {
-        throw new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
+      const secret = process.env.JWT_REFRESH_SECRET || '';
+      const decoded = this._jwtService.verifyToken(refreshToken, secret) as { userId: string };
+      
+      if (!decoded?.userId) {
+        throw new UnauthorizedError(ErrorMessages.INVALID_CREDENTIALS);
       }
 
-      let user = await this._userRepository.findById(decoded.userId);
-      let role = user?.role;
-
-      if (!user) {
-        // Check if it's an admin
-        const admin = await Admin.findById(decoded.userId);
-        if (!admin) {
-          throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
-        }
-        // Admin found
-        const accessToken = this._jwtService.generateAccessToken({ userId: admin.id, role: 'admin' });
-        return { accessToken };
+      const user = await this._userRepository.findById(decoded.userId);
+      if (user) {
+        if (user.isBlocked) throw new ForbiddenError(ErrorMessages.ACCOUNT_BLOCKED);
+        return {
+          accessToken: this._jwtService.generateAccessToken({ userId: user.id, role: user.role })
+        };
       }
 
-      if (user.isBlocked) {
-        throw new AppError(ErrorMessages.ACCOUNT_BLOCKED, HttpStatus.FORBIDDEN);
+      const admin = await this._adminRepository.findOne({ _id: decoded.userId });
+      if (admin) {
+        return {
+          accessToken: this._jwtService.generateAccessToken({ userId: admin.id, role: 'admin' })
+        };
       }
 
-      const accessToken = this._jwtService.generateAccessToken({ userId: user.id, role: role || 'user' });
-      return { accessToken };
+      throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
     } catch (error) {
       logger.error('Refresh Token Error:', error);
-      throw new AppError(ErrorMessages.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
+      throw new UnauthorizedError(ErrorMessages.INVALID_CREDENTIALS);
     }
   }
-
-
 }

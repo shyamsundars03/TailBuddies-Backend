@@ -1,6 +1,15 @@
 import { Router } from 'express';
 import { authController, doctorController } from '../config/di';
-import { validateRegistration } from '../middleware/validation.middleware';
+import { validateRequest } from '../middleware/zod-validation.middleware';
+import { 
+    LoginSchema, 
+    RegisterSchema, 
+    VerifyOtpSchema, 
+    ForgotPasswordSchema, 
+    ResetPasswordSchema, 
+    ResendOtpSchema,
+    GoogleLoginSchema
+} from '../dto/auth/auth.schema';
 
 const router = Router();
 
@@ -10,13 +19,13 @@ router.get('/doctors', doctorController.getAllDoctors);
 router.get('/doctors/:id', doctorController.getById);
 
 // Auth Routes
-router.post('/signup', validateRegistration, authController.register);
-router.post('/signin', authController.login);
-router.post('/google-login', authController.googleLogin);
-router.post('/verify-otp', authController.verifyOtp);
-router.post('/resend-otp', authController.resendOtp);
-router.post('/forgot-password', authController.forgotPassword);
-router.post('/reset-password', authController.resetPassword);
+router.post('/signup', validateRequest(RegisterSchema), authController.register);
+router.post('/signin', validateRequest(LoginSchema), authController.login);
+router.post('/google-login', validateRequest(GoogleLoginSchema), authController.googleLogin);
+router.post('/verify-otp', validateRequest(VerifyOtpSchema), authController.verifyOtp);
+router.post('/resend-otp', validateRequest(ResendOtpSchema), authController.resendOtp);
+router.post('/forgot-password', validateRequest(ForgotPasswordSchema), authController.forgotPassword);
+router.post('/reset-password', validateRequest(ResetPasswordSchema), authController.resetPassword);
 router.post('/refresh-token', authController.refresh);
 router.post('/logout', authController.logout);
 

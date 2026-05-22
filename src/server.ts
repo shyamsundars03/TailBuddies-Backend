@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import http from 'http';
 import { Server } from 'socket.io';
 import { SocketService } from './services/socket.service';
+import { chatService } from './config/di';
 
 const PORT = env.port;
 
@@ -23,7 +24,7 @@ const startServer = async () => {
     });
 
     // Initialize SocketService
-    SocketService.initialize(io);
+    SocketService.initialize(io, chatService);
 
     const server = httpServer.listen(PORT, () => {
       logger.info(`🚀 Server started on port ${PORT}`);

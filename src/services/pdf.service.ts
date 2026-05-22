@@ -1,7 +1,10 @@
 import { IPdfService } from './interfaces/IPdfService';
 import logger from '../logger';
+import { getErrorMessage, toServiceError } from '../utils/service-error.util';
 const PdfPrinter = require('pdfmake');
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
+import { AppointmentPdfInput, PrescriptionMedicationRow, PrescriptionPdfInput } from '../types/pdf.types';
+import { asPopulatedUser } from '../types/populated.types';
 
 export class PdfService implements IPdfService {
     private fonts = {
@@ -13,7 +16,7 @@ export class PdfService implements IPdfService {
         }
     };
 
-    async generatePrescriptionPdf(prescription: any, appointment: any): Promise<Buffer> {
+    async generatePrescriptionPdf(prescription: PrescriptionPdfInput, appointment: AppointmentPdfInput): Promise<Buffer> {
         try {
             // pdfmake 0.3.x uses a unified instance exported by the module
             const pdfmake = PdfPrinter;
@@ -55,7 +58,7 @@ export class PdfService implements IPdfService {
                             {
                                 stack: [
                                     { text: 'CONSULTING VETERINARIAN', style: 'sectionLabel' },
-                                    { text: `Dr. ${appointment.doctorId?.userId?.username || 'N/A'}`, style: 'boldText' },
+                                    { text: `Dr. ${asPopulatedUser(appointment.doctorId?.userId)?.username || 'N/A'}`, style: 'boldText' },
                                     { text: appointment.doctorId?.profile?.designation || 'Veterinary Surgeon', style: 'mutedText' },
                                     { text: `License: ${appointment.doctorId?.profile?.licenseNumber || 'N/A'}`, style: 'mutedText' }
                                 ]
@@ -150,7 +153,7 @@ export class PdfService implements IPdfService {
                                     { text: 'FREQUENCY', style: 'tableHeader' },
                                     { text: 'DURATION', style: 'tableHeader' }
                                 ],
-                                ...(prescription.medications || []).map((m: any) => [
+                                ...(prescription.medications || []).map((m: PrescriptionMedicationRow) => [
                                     { text: m.name, style: 'medName' },
                                     { text: m.dosage, style: 'medText' },
                                     { text: m.frequency, style: 'medText' },
@@ -159,7 +162,10 @@ export class PdfService implements IPdfService {
                             ]
                         },
                         layout: {
-                            hLineWidth: (i: number, node: any) => (i === 0 || i === 1 || i === node.table.body.length) ? 1 : 0.5,
+                            hLineWidth: (i: number, node?: { table?: { body?: unknown[] } }) => {
+                                const rowCount = node?.table?.body?.length ?? 0;
+                                return (i === 0 || i === 1 || i === rowCount) ? 1 : 0.5;
+                            },
                             vLineWidth: () => 0,
                             hLineColor: (i: number) => (i === 0 || i === 1) ? '#002B49' : '#f1f5f9',
                             paddingLeft: () => 10,
@@ -187,7 +193,7 @@ export class PdfService implements IPdfService {
                                 stack: [
                                     { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 150, y2: 0, lineWidth: 1, lineColor: '#e2e8f0' }] },
                                     { text: 'AUTHORIZED SIGNATURE', style: 'tiny', margin: [0, 5, 0, 2], alignment: 'center' },
-                                    { text: `Dr. ${appointment.doctorId?.userId?.username}`, style: 'boldText', alignment: 'center', color: '#002B49' }
+                                    { text: `Dr. ${asPopulatedUser(appointment.doctorId?.userId)?.username || 'N/A'}`, style: 'boldText', alignment: 'center', color: '#002B49' }
                                 ]
                             }
                         ]
@@ -219,9 +225,9 @@ export class PdfService implements IPdfService {
 
             // getBuffer() returns a Promise<Buffer>
             return await pdfDoc.getBuffer();
-        } catch (error: any) {
-            logger.error('Error in PdfService.generatePrescriptionPdf', { error: error.message });
-            throw error;
+        } catch (error: unknown) {
+            logger.error('Error in PdfService.generatePrescriptionPdf', { error: getErrorMessage(error) });
+            throw toServiceError(error, 'Failed to generate prescription PDF');
         }
     }
 }

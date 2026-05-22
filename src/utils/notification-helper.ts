@@ -1,5 +1,5 @@
 import { INotificationService } from '../services/notification.service';
-import { AppointmentStatus } from '../enums/appointment-status.enum';
+// import { AppointmentStatus } from '../enums/appointment-status.enum';
 
 export class NotificationHelper {
     private static _notificationService: INotificationService;
@@ -50,6 +50,16 @@ export class NotificationHelper {
     static async notifyAppointmentReminder(ownerId: string, doctorUserId: string, petName: string, time: string, appointmentId: string) {
         const title = 'Appointment Reminder';
         const msg = `Your appointment for ${petName} starts in 5 minutes at ${time}.`;
+
+        await Promise.all([
+            this.create(ownerId, title, msg, 'appointment', `/owner/bookings/${appointmentId}`),
+            this.create(doctorUserId, title, msg, 'appointment', `/doctor/appointments/${appointmentId}`)
+        ]);
+    }
+
+    static async notifyAppointmentStarted(ownerId: string, doctorUserId: string, petName: string, appointmentId: string) {
+        const title = 'Consultation Started';
+        const msg = `The consultation for ${petName} has officially started. Both parties are now checked in.`;
 
         await Promise.all([
             this.create(ownerId, title, msg, 'appointment', `/owner/bookings/${appointmentId}`),

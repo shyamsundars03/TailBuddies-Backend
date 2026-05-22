@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { INotification } from '../models/notification.model';
 import { INotificationRepository } from '../repositories/notification.repository';
 import { SocketService } from './socket.service';
@@ -16,9 +17,15 @@ export class NotificationService implements INotificationService {
         this._notificationRepository = notificationRepository;
     }
 
-    async createNotification(userId: string, title: string, message: string, type: any = 'other', link?: string): Promise<INotification> {
+    async createNotification(
+        userId: string,
+        title: string,
+        message: string,
+        type: INotification['type'] = 'other',
+        link?: string
+    ): Promise<INotification> {
         const notification = await this._notificationRepository.create({
-            recipientId: userId as any,
+            recipientId: new mongoose.Types.ObjectId(userId),
             title,
             message,
             type,

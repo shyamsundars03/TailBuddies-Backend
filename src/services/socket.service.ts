@@ -1,24 +1,29 @@
 import { Server, Socket } from 'socket.io';
 const cookie = require('cookie');
 import logger from '../logger';
-import { Appointment } from '../models/appointment.model';
 import { JwtService } from './jwt.service';
 import { env } from '../config/env';
-import { ChatMessage } from '../models/chat-message.model';
+import { IChatService } from './interfaces/IChatService';
 
 interface AuthenticatedSocket extends Socket {
     userId?: string;
-    roles?: string[];
+    role?: string;
+}
+
+interface JwtPayload {
+    userId: string;
+    role: string;
 }
 
 export class SocketService {
     private static _io: Server;
     private static _jwtService = new JwtService();
+    private static _chatService: IChatService;
 
-    public static initialize(io: Server) {
+    public static initialize(io: Server, chatService: IChatService) {
         this._io = io;
+        this._chatService = chatService;
 
-        // Authentication Middleware
         this._io.use((socket: AuthenticatedSocket, next) => {
             try {
                 let token = socket.handshake.auth?.token;
@@ -35,9 +40,9 @@ export class SocketService {
                     return next(new Error('Authentication error: No token provided'));
                 }
 
-                const decoded = this._jwtService.verifyToken(token, env.jwtAccessSecret) as any;
+                const decoded = this._jwtService.verifyToken(token, env.jwtAccessSecret) as JwtPayload;
                 socket.userId = decoded.userId;
-                socket.roles = decoded.role;
+                socket.role = decoded.role;
 
                 next();
             } catch (error) {
@@ -53,69 +58,53 @@ export class SocketService {
                 socket.join(`user:${socket.userId}`);
             }
 
-            socket.on('join-room', (appointmentId: string) => {
-                socket.join(`appointment:${appointmentId}`);
-                logger.info(`User ${socket.userId} joined room appointment:${appointmentId}`);
+            socket.on('join-room', async (appointmentId: string) => {
+                try {
+                    if (!socket.userId || !socket.role) {
+                        throw new Error('Authentication error: User not identified');
+                    }
+                    await this._chatService.getChatHistory(appointmentId, socket.userId, socket.role);
+                    socket.join(`appointment:${appointmentId}`);
+                    logger.info(`User ${socket.userId} joined room appointment:${appointmentId}`);
+                } catch (error: unknown) {
+                    const message = error instanceof Error ? error.message : 'Failed to join room';
+                    logger.warn(`Join room denied for ${socket.userId}: ${message}`);
+                    socket.emit('error', { message });
+                }
             });
 
-            socket.on('send-message', async (data: { appointmentId: string, senderId: string, senderRole: 'owner' | 'doctor', message: string }) => {
+            socket.on('send-message', async (data: {
+                appointmentId: string;
+                senderId: string;
+                senderRole: 'owner' | 'doctor';
+                message: string;
+            }) => {
                 const { appointmentId, senderId, senderRole, message } = data;
 
                 try {
-                    // Verify the sender matches the authenticated user
-                    // Ensure both are compared as strings to avoid any mismatch
-                    const authenticatedUserId = String(socket.userId);
-                    const providedSenderId = String(senderId);
-
-                    if (providedSenderId !== authenticatedUserId) {
-                        logger.warn(`Sender ID mismatch for appointment ${appointmentId}: Authenticated=${authenticatedUserId}, Provided=${providedSenderId}, SocketID=${socket.id}. Payload details: roles=${JSON.stringify(socket.roles)}, senderRole=${senderRole}`);
-                        throw new Error('Unauthorized: Sender ID mismatch');
+                    if (!socket.userId || !socket.role) {
+                        throw new Error('Authentication error: User not identified');
                     }
 
-                    // Time-restricting logic: check if appointment is currently active
-                    const appointment = await Appointment.findById(appointmentId);
-                    if (!appointment) throw new Error('Appointment not found');
-
-                    const now = new Date();
-                    const [startH, startM] = appointment.appointmentStartTime.split(':').map(Number);
-                    const [endH, endM] = appointment.appointmentEndTime.split(':').map(Number);
-
-                    const apptStart = new Date(appointment.appointmentDate);
-                    apptStart.setHours(startH, startM, 0, 0);
-
-                    const apptEnd = new Date(appointment.appointmentDate);
-                    apptEnd.setHours(endH, endM, 0, 0);
-
-                    if (now < apptStart || now > apptEnd) {
-                        socket.emit('error', { message: 'Chat is only active during the consultation time window.' });
-                        return;
-                    }
-
-
-                    try {
-                        await ChatMessage.create({
-                            appointmentId: appointment._id,
-                            senderId: authenticatedUserId,
-                            senderRole: senderRole,
-                            message: message,
-                            timestamp: now
-                        });
-                        logger.info(`Message persisted for appointment ${appointmentId}`);
-                    } catch (dbError) {
-                        logger.error('Failed to persist chat message:', dbError);
-
-                    }
+                    const savedMessage = await this._chatService.sendMessage(socket.userId, socket.role, {
+                        appointmentId,
+                        senderId,
+                        senderRole,
+                        message,
+                    });
 
                     this._io.to(`appointment:${appointmentId}`).emit('receive-message', {
                         senderId,
                         senderRole,
                         message,
-                        timestamp: new Date()
+                        timestamp: savedMessage.timestamp || new Date(),
                     });
-
-                } catch (error: any) {
-                    logger.error(`Socket error: ${error.message}`);
-                    socket.emit('error', { message: error.message || 'Failed to send message.' });
+                } catch (error: unknown) {
+                    const errMessage = error instanceof Error
+                        ? error.message
+                        : 'Failed to send message.';
+                    logger.error(`Socket error: ${errMessage}`);
+                    socket.emit('error', { message: errMessage });
                 }
             });
 
@@ -125,7 +114,7 @@ export class SocketService {
         });
     }
 
-    public static emitToUser(userId: string, event: string, data: any) {
+    public static emitToUser(userId: string, event: string, data: unknown) {
         if (this._io) {
             this._io.to(`user:${userId}`).emit(event, data);
         }

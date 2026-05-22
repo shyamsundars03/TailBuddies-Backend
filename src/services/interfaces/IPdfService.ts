@@ -1,3 +1,3 @@
 export interface IPdfService {
-    generatePrescriptionPdf(prescription: any, appointment: any): Promise<Buffer>;
+    generatePrescriptionPdf(prescription: unknown, appointment: unknown): Promise<Buffer>;
 }

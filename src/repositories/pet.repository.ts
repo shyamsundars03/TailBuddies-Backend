@@ -24,7 +24,7 @@ export class PetRepository implements IPetRepository {
 
 
     async findByOwnerId(ownerId: string, page: number, limit: number, search?: string): Promise<{ pets: IPet[]; total: number }> {
-        const query: any = { ownerId };
+        const query: Record<string, unknown> = { ownerId };
         
         if (search) {
             query.$or = [
@@ -48,7 +48,7 @@ export class PetRepository implements IPetRepository {
 
 
     async findAll(page: number, limit: number, search?: string): Promise<{ pets: IPet[]; total: number }> {
-        const query: any = {};
+        const query: Record<string, unknown> = {};
         
         if (search) {
             query.$or = [
@@ -98,8 +98,19 @@ export class PetRepository implements IPetRepository {
         return result !== null;
     }
 
-    async findIdsByName(name: string): Promise<string[]> {
-        const pets = await Pet.find({ name: { $regex: name, $options: 'i' } }).select('_id');
+    async findIdsBySearch(search: string, ownerId?: string): Promise<string[]> {
+        const query: any = { 
+            $or: [
+                { name: { $regex: search, $options: 'i' } },
+                { species: { $regex: search, $options: 'i' } }
+            ]
+        };
+        if (ownerId) query.ownerId = ownerId;
+        const pets = await Pet.find(query).select('_id');
         return pets.map(p => p._id.toString());
+    }
+
+    async countDocuments(query: Record<string, unknown> = {}): Promise<number> {
+        return await Pet.countDocuments(query);
     }
 }

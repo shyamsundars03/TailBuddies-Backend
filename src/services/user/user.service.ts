@@ -2,11 +2,12 @@ import { IUserRepository } from '../../repositories/interfaces/IUserRepository';
 import { IOtpRepository } from '../../repositories/interfaces/IOtpRepository';
 import { IUserService } from '../interfaces/IUserService';
 import { IEmailService } from '../interfaces/IEmailService';
-import { AppError } from '../../errors/app-error';
-import { HttpStatus, ErrorMessages } from '../../constants';
+import { NotFoundError, ValidationError } from '../../errors/app-error';
+import { ErrorMessages } from '../../constants';
 import logger from '../../logger';
 import crypto from 'crypto';
 import { IUser } from '../../models/user.models';
+import { UpdateProfileInput, VerifyNewEmailInput, ProfilePicInput, OtpInput, NewEmailInput } from '../../dto/user/user.schema';
 
 export class UserService implements IUserService {
     
@@ -36,7 +37,7 @@ export class UserService implements IUserService {
     async getUserProfile(userId: string): Promise<IUser> {
         const user = await this._userRepository.findById(userId);
         if (!user) {
-            throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+            throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
         }
         return user;
     }
@@ -49,23 +50,25 @@ export class UserService implements IUserService {
 
 
 
-    async updateUserProfile(userId: string, data: Partial<IUser>): Promise<IUser> {
+    async updateUserProfile(userId: string, data: UpdateProfileInput): Promise<IUser> {
         const user = await this._userRepository.findById(userId);
         if (!user) {
-            throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+            throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
         }
 
-       
-        if (data.username) user.username = data.username;
-        if (data.phone !== undefined) user.phone = data.phone;
-        if (data.gender) user.gender = data.gender;
-        if (data.address !== undefined) user.address = data.address;
-        if (data.city !== undefined) user.city = data.city;
-        if (data.state !== undefined) user.state = data.state;
-        if (data.country !== undefined) user.country = data.country;
-        if (data.pincode !== undefined) user.pincode = data.pincode;
-
-        const updatedUser = await user.save();
+        const updatedUser = await this._userRepository.update(userId, {
+            username: data.username,
+            phone: data.phone,
+            gender: data.gender,
+            address: data.address,
+            city: data.city,
+            state: data.state,
+            country: data.country,
+            pincode: data.pincode
+        });
+        
+        if (!updatedUser) throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
+        
         logger.info('User profile updated', { userId, fields: Object.keys(data) });
         return updatedUser;
     }
@@ -74,15 +77,16 @@ export class UserService implements IUserService {
 
 
 
-    async updateProfilePic(userId: string, profilePic: string): Promise<IUser> {
+    async updateProfilePic(userId: string, data: ProfilePicInput): Promise<IUser> {
+        const { profilePic } = data;
         const user = await this._userRepository.findById(userId);
         if (!user) {
-            throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+            throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
         }
 
-        user.profilePic = profilePic;
-        await user.save();
-        return user;
+        const updatedUser = await this._userRepository.update(userId, { profilePic });
+        if (!updatedUser) throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
+        return updatedUser;
     }
 
 
@@ -100,7 +104,7 @@ export class UserService implements IUserService {
     async initiateEmailChange(userId: string): Promise<void> {
         const user = await this._userRepository.findById(userId);
         if (!user) {
-            throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+            throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
         }
 
         const otp = this.generateOtp();
@@ -127,15 +131,16 @@ export class UserService implements IUserService {
 
 
 
-    async verifyCurrentEmail(userId: string, otp: string): Promise<void> {
+    async verifyCurrentEmail(userId: string, data: OtpInput): Promise<void> {
+        const { otp } = data;
         const user = await this._userRepository.findById(userId);
         if (!user) {
-            throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+            throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
         }
 
         const otpDoc = await this._otpRepository.findOtp(user.email);
         if (!otpDoc || otpDoc.otp !== otp) {
-            throw new AppError(ErrorMessages.INVALID_OTP, HttpStatus.BAD_REQUEST);
+            throw new ValidationError(ErrorMessages.INVALID_OTP);
         }
 
         await this._otpRepository.deleteOtp(user.email);
@@ -151,7 +156,8 @@ export class UserService implements IUserService {
 
 
 
-    async sendOtpToNewEmail(userId: string, newEmail: string): Promise<void> {
+    async sendOtpToNewEmail(userId: string, data: NewEmailInput): Promise<void> {
+        const { newEmail } = data;
         const otp = this.generateOtp();
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
         await this._otpRepository.createOtp(newEmail, otp, expiresAt);
@@ -173,25 +179,26 @@ export class UserService implements IUserService {
 
 
 
-    async verifyNewEmail(userId: string, newEmail: string, otp: string): Promise<IUser> {
+    async verifyNewEmail(userId: string, data: VerifyNewEmailInput): Promise<IUser> {
+        const { newEmail, otp } = data;
         const user = await this._userRepository.findById(userId);
         if (!user) {
-            throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+            throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
         }
 
         const otpDoc = await this._otpRepository.findOtp(newEmail);
         if (!otpDoc || otpDoc.otp !== otp) {
-            throw new AppError(ErrorMessages.INVALID_OTP, HttpStatus.BAD_REQUEST);
+            throw new ValidationError(ErrorMessages.INVALID_OTP);
         }
 
      
-        user.email = newEmail.toLowerCase();
-        await user.save();
+        const updatedUser = await this._userRepository.update(userId, { email: newEmail.toLowerCase() });
+        if (!updatedUser) throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
 
         await this._otpRepository.deleteOtp(newEmail);
         logger.info('Email changed successfully', { userId, newEmail });
 
-        return user;
+        return updatedUser;
     }
 
 

@@ -1,26 +1,32 @@
 import { IDoctorRepository } from '../../repositories/interfaces/IDoctorRepository';
 import { ISpecialtyRepository } from '../../repositories/interfaces/ISpecialtyRepository';
+import { IUserRepository } from '../../repositories/interfaces/IUserRepository';
+import { ISlotRepository } from '../../repositories/interfaces/ISlotRepository';
 import { IDoctorService } from '../interfaces/IDoctorService';
 import { IDoctor } from '../../models/doctor.model';
-import { UpdateDoctorProfileDto, VerifyDoctorDto } from '../../dto/doctor.dto';
-import { AppError } from '../../errors/app-error';
+import { UpdateDoctorProfileInput, VerifyDoctorInput } from '../../dto/doctor/doctor.schema';
+import { AppError, NotFoundError, ValidationError } from '../../errors/app-error';
 import { HttpStatus, ErrorMessages } from '../../constants';
 import logger from '../../logger';
-import Slot from '../../models/slot.model';
+import mongoose from 'mongoose';
+import { ISpecialty } from '../../models/specialty.model';
 
 export class DoctorService implements IDoctorService {
-
-
-
     private readonly _doctorRepository: IDoctorRepository;
     private readonly _specialtyRepository: ISpecialtyRepository;
+    private readonly _userRepository: IUserRepository;
+    private readonly _slotRepository: ISlotRepository;
 
     constructor(
         doctorRepository: IDoctorRepository,
-        specialtyRepository: ISpecialtyRepository
+        specialtyRepository: ISpecialtyRepository,
+        userRepository: IUserRepository,
+        slotRepository: ISlotRepository
     ) {
         this._doctorRepository = doctorRepository;
         this._specialtyRepository = specialtyRepository;
+        this._userRepository = userRepository;
+        this._slotRepository = slotRepository;
     }
 
 
@@ -30,9 +36,8 @@ export class DoctorService implements IDoctorService {
         let doctor = await this._doctorRepository.findByUserIdWithDetails(userId);
 
         if (!doctor) {
-
             logger.info('Lazy creating doctor profile for user', { userId });
-            await this._doctorRepository.create({ userId } as any);
+            await this._doctorRepository.create({ userId: new mongoose.Types.ObjectId(userId) } as unknown as Partial<IDoctor>);
             doctor = await this._doctorRepository.findByUserIdWithDetails(userId);
         }
 
@@ -51,14 +56,12 @@ export class DoctorService implements IDoctorService {
 
 
 
-    async updateDoctorProfile(userId: string, data: UpdateDoctorProfileDto): Promise<IDoctor> {
+    async updateDoctorProfile(userId: string, data: UpdateDoctorProfileInput): Promise<IDoctor> {
         let doctor = await this._doctorRepository.findByUserId(userId);
 
         if (!doctor) {
-
-            doctor = await this._doctorRepository.create({ userId } as any);
+            doctor = await this._doctorRepository.create({ userId: new mongoose.Types.ObjectId(userId) } as unknown as Partial<IDoctor>);
         }
-
 
         if (!doctor.verificationStatus) {
             doctor.verificationStatus = {
@@ -70,25 +73,24 @@ export class DoctorService implements IDoctorService {
             };
         }
 
-
-        const userData = data as any;
+        const userData = data as Record<string, unknown>;
         if (userData.username || userData.gender || userData.phone) {
-            const updateFields: any = {};
+            const updateFields: Record<string, unknown> = {};
             if (userData.username) updateFields.username = userData.username;
             if (userData.gender) updateFields.gender = userData.gender;
             if (userData.phone) updateFields.phone = userData.phone;
 
-            await (this._doctorRepository as any)._model.db.model('User').findByIdAndUpdate(doctor.userId, updateFields);
-            // console.log(`[DoctorService] Synchronized user fields for ${userId}:`, updateFields);
+            await this._userRepository.update(doctor.userId.toString(), updateFields);
         }
-
 
         if (data.profile) {
-            doctor.profile = { ...doctor.profile, ...data.profile } as any;
-
+            const profileUpdate = { ...data.profile } as Record<string, unknown>;
+            if (profileUpdate.biography && !profileUpdate.about) {
+                profileUpdate.about = profileUpdate.biography;
+            }
+            delete profileUpdate.biography;
+            doctor.profile = { ...doctor.profile, ...profileUpdate } as IDoctor['profile'];
         }
-
-
 
         if (data.clinicInfo) {
             const { address, location, ...rest } = data.clinicInfo;
@@ -143,25 +145,23 @@ export class DoctorService implements IDoctorService {
             doctor.certificates = data.certificates.map(cert => ({
                 ...cert,
                 isVerified: false
-            })) as any;
+            })) as IDoctor['certificates'];
             doctor.verificationStatus.certificates = false;
         }
 
         if (data.businessHours) {
-            // console.log(`[DoctorService] Updating business hours for ${userId}:`, JSON.stringify(data.businessHours));
-            doctor.businessHours = data.businessHours as any;
+            doctor.businessHours = data.businessHours as IDoctor['businessHours'];
             doctor.verificationStatus.businessHours = false;
             doctor.markModified('businessHours');
-            // console.log(`[DoctorService] Set businessHours on doctor object:`, JSON.stringify(doctor.businessHours));
         }
 
         if (data.recurringSchedules) {
-            doctor.recurringSchedules = data.recurringSchedules as any;
+            doctor.recurringSchedules = data.recurringSchedules as IDoctor['recurringSchedules'];
             doctor.markModified('recurringSchedules');
         }
 
         if (data.profile?.specialtyId) {
-            doctor.profile.specialtyId = data.profile.specialtyId as any;
+            doctor.profile.specialtyId = new mongoose.Types.ObjectId(data.profile.specialtyId);
         }
 
         if (data.appointmentDuration) {
@@ -172,32 +172,33 @@ export class DoctorService implements IDoctorService {
             doctor.isActive = data.isActive;
         }
 
-
         doctor.markModified('verificationStatus');
         doctor.markModified('profile');
-
+        if (data.clinicInfo) doctor.markModified('clinicInfo');
+        if (data.experience) doctor.markModified('experience');
+        if (data.education) doctor.markModified('education');
+        if (data.certificates) doctor.markModified('certificates');
 
         const updatedDoctor = await doctor.save();
 
+        if (!updatedDoctor) {
+            throw new AppError('Failed to update doctor profile', HttpStatus.INTERNAL_SERVER_ERROR);
+        }
 
         try {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            await Slot.deleteMany({
+            await this._slotRepository.deleteMany({
                 vetId: doctor._id,
                 date: { $gte: today },
                 isBooked: false
             });
             logger.info(`[DoctorService] Cleared future available slots for doctor ${doctor._id} due to profile update`);
-            // console.log(`[DoctorService] Cleared future slots for doctor ${doctor._id} to force regeneration.`);
         } catch (error) {
-            console.error(`[DoctorService] Error clearing future slots:`, error);
+            logger.error(`[DoctorService] Error clearing future slots:`, error);
         }
 
-
-
         logger.info('Doctor profile updated successfully', { userId, fields: Object.keys(data) });
-
 
         return updatedDoctor;
     }
@@ -213,15 +214,11 @@ export class DoctorService implements IDoctorService {
 
 
 
-    async verifyDoctor(doctorId: string, data: VerifyDoctorDto): Promise<IDoctor> {
-
-
+    async verifyDoctor(doctorId: string, data: VerifyDoctorInput): Promise<IDoctor> {
         const doctor = await this._doctorRepository.findById(doctorId);
 
-
-
         if (!doctor) {
-            throw new AppError(ErrorMessages.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
+            throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
         }
 
         if (data.verificationStatus) {
@@ -246,47 +243,115 @@ export class DoctorService implements IDoctorService {
                 };
             }
         } else if (data.verificationStatus) {
-
-            const sections = ['clinic', 'education', 'experience', 'certificates'];
-            const allVerified = sections.every(s => (doctor.verificationStatus as any)[s] === true);
+            const sections = ['clinic', 'education', 'experience', 'certificates'] as const;
+            const allVerified = sections.every(s => doctor.verificationStatus[s] === true);
 
             if (allVerified) {
                 doctor.isVerified = true;
                 doctor.profileStatus = 'verified';
                 doctor.rejectionReason = null;
-                // console.log(`[DoctorService] All sections verified for ${doctorId}. Automatically marking as verified.`);
             }
         }
 
-        const updatedDoctor = await doctor.save();
-
-
+        const updatedDoctor = await this._doctorRepository.update(doctorId, doctor.toObject());
+        if (!updatedDoctor) {
+            throw new AppError('Failed to update doctor verification status', HttpStatus.INTERNAL_SERVER_ERROR);
+        }
         logger.info('Doctor verification status updated', { doctorId, status: data.isVerified });
         return updatedDoctor;
     }
 
+// async verifyDoctor(
+//     doctorId: string,
+//     data: VerifyDoctorInput
+// ): Promise<IDoctor> {
 
+//     const doctor = await this._doctorRepository.findById(doctorId);
+
+//     if (!doctor) {
+//         throw new NotFoundError(ErrorMessages.USER_NOT_FOUND);
+//     }
+
+//     const updateData: Partial<IDoctor> = {};
+
+//     if (data.verificationStatus) {
+//         updateData.verificationStatus = {
+//             ...doctor.verificationStatus,
+//             ...data.verificationStatus
+//         };
+//     }
+
+//     if (data.isVerified !== undefined) {
+
+//         updateData.isVerified = data.isVerified;
+
+//         updateData.profileStatus =
+//             data.isVerified ? 'verified' : 'rejected';
+
+//         if (!data.isVerified && data.rejectionReason) {
+//             updateData.rejectionReason = data.rejectionReason;
+//         }
+
+//         if (data.isVerified) {
+
+//             updateData.rejectionReason = null;
+
+//             updateData.verificationStatus = {
+//                 clinic: true,
+//                 education: true,
+//                 experience: true,
+//                 certificates: true,
+//                 businessHours:
+//                     doctor.verificationStatus?.businessHours || false
+//             };
+//         }
+//     }
+
+//     const updatedDoctor =
+//         await this._doctorRepository.update(
+//             doctorId,
+//             updateData
+//         );
+
+//     if (!updatedDoctor) {
+//         throw new AppError(
+//             'Failed to update doctor verification status',
+//             HttpStatus.INTERNAL_SERVER_ERROR
+//         );
+//     }
+
+//     return updatedDoctor;
+// }
 
 
 
     async requestVerification(userId: string): Promise<IDoctor> {
         const doctor = await this.getDoctorProfile(userId);
         if (!doctor) {
-            throw new AppError('Profile not found. Please complete and save your basic details first.', HttpStatus.NOT_FOUND);
+            throw new NotFoundError('Profile not found. Please complete and save your basic details first.');
         }
 
 
         const errors: string[] = [];
 
-
-        // if (!doctor.profile.designation) errors.push('Designation is required');
-
+        if (!doctor.profile?.designation) errors.push('Designation is required');
+        if (!doctor.profile?.specialtyId) errors.push('Specialty is required');
+        if (!doctor.profile?.about || doctor.profile.about.trim().length < 10) {
+            errors.push('Professional about section is required (min 10 characters)');
+        }
+        if (!doctor.profile?.consultationFees || doctor.profile.consultationFees <= 0) {
+            errors.push('Consultation fee is required');
+        }
+        if (doctor.profile?.experienceYears === undefined || doctor.profile.experienceYears === null) {
+            errors.push('Years of experience is required');
+        }
+        if (!doctor.profile?.keywords?.length) errors.push('At least one focus area is required');
 
         if (!doctor.clinicInfo.clinicName) errors.push('Clinic name is required');
         if (!doctor.clinicInfo.clinicPic) errors.push('Clinic picture is required');
         if (!doctor.clinicInfo.address.city) errors.push('Clinic location details are required');
 
-
+        if (doctor.experience.length === 0) errors.push('At least one experience record is required');
         if (doctor.education.length === 0) errors.push('At least one education record is required');
         if (doctor.education.some(edu => !edu.educationFile)) errors.push('Education certificates are required (PDF)');
 
@@ -296,18 +361,22 @@ export class DoctorService implements IDoctorService {
 
 
         if (errors.length > 0) {
-            throw new AppError(`Incomplete Profile: ${errors.join(', ')}`, HttpStatus.BAD_REQUEST);
+            throw new ValidationError(`Incomplete Profile: ${errors.join(', ')}`);
         }
 
         doctor.profileStatus = 'under_review';
         doctor.isVerified = false;
 
+        const updatedDoctor = await this._doctorRepository.update(doctor._id.toString(), {
+            profileStatus: 'under_review',
+            isVerified: false
+        });
 
+        if (!updatedDoctor) {
+            throw new AppError('Failed to submit verification request', HttpStatus.INTERNAL_SERVER_ERROR);
+        }
 
-        return await doctor.save();
-
-
-
+        return updatedDoctor;
     }
 
 
@@ -318,11 +387,8 @@ export class DoctorService implements IDoctorService {
 
 
 
-    async getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string, filters?: any, sortBy?: string): Promise<{ doctors: IDoctor[], total: number }> {
-        const filter: any = {};
-
-
-        const andFilters: any[] = [];
+    async getAllDoctors(page: number, limit: number, search?: string, isVerified?: boolean, status?: string, filters?: Record<string, unknown>, sortBy?: string): Promise<{ doctors: IDoctor[], total: number }> {
+        const andFilters: Record<string, unknown>[] = [];
 
         if (isVerified !== undefined) {
             andFilters.push({ isVerified });
@@ -354,18 +420,18 @@ export class DoctorService implements IDoctorService {
             if (filters.minRating) {
                 const rating = Number(filters.minRating);
                 if (!isNaN(rating)) {
-                    // Match the exact star bucket (e.g., 3 means [3.0, 4.0))
-                    andFilters.push({ averageRating: { $gte: rating, $lt: rating + 1 } });
+                    andFilters.push({ reviewCount: { $gt: 0 } });
+                    andFilters.push({ averageRating: { $lte: rating } });
                 }
             }
         }
 
         if (search) {
-            const matchingUsers = await (this._doctorRepository as any)._model.db.model('User').find({
+            const users = await this._userRepository.findAll({
                 username: { $regex: search, $options: 'i' }
-            }).select('_id');
+            });
 
-            const userIds = matchingUsers.map((u: any) => u._id);
+            const userIds = users.map(u => u._id);
 
             andFilters.push({
                 $or: [
@@ -377,19 +443,16 @@ export class DoctorService implements IDoctorService {
         }
 
         if (filters?.gender) {
-            const genderUsers = await (this._doctorRepository as any)._model.db.model('User').find({
+            const genderUsers = await this._userRepository.findAll({
                 gender: { $regex: `^${filters.gender}$`, $options: 'i' }
-            }).select('_id');
-            const genderUserIds = genderUsers.map((u: any) => u._id);
+            });
+            const genderUserIds = genderUsers.map(u => u._id);
             andFilters.push({ userId: { $in: genderUserIds } });
         }
 
-        if (andFilters.length > 0) {
-            filter.$and = andFilters;
-        }
+        const filter: Record<string, unknown> = andFilters.length > 0 ? { $and: andFilters } : {};
 
-        // Sorting logic
-        let sort: any = { averageRating: -1, createdAt: -1 };
+        let sort: Record<string, number> = { averageRating: -1, createdAt: -1 };
         if (sortBy) {
             if (sortBy === 'Price (Low to High)') {
                 sort = { 'profile.consultationFees': 1 };
@@ -400,21 +463,11 @@ export class DoctorService implements IDoctorService {
             }
         }
 
-        const options = {
-            skip: (page - 1) * limit,
-            limit: limit,
-            sort: sort
-        };
-
-        const doctors = await (this._doctorRepository as any)._model.find(filter, null, options)
-            .populate({ path: 'userId', select: 'username email role profilePic gender phone', model: 'User' })
-            .populate({ path: 'profile.specialtyId', model: 'Specialty' });
-        const total = await (this._doctorRepository as any)._model.countDocuments(filter);
-
+        const { items: doctors, total } = await this._doctorRepository.findWithPagination(filter, page, limit, sort);
         return { doctors, total };
     }
 
-    async getSpecialties(): Promise<any[]> {
+    async getSpecialties(): Promise<ISpecialty[]> {
         return await this._specialtyRepository.findAll({ status: 'active' });
     }
 }

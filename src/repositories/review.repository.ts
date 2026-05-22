@@ -85,9 +85,9 @@ export class ReviewRepository extends BaseRepository<IReview> implements IReview
             });
     }
 
-    async findWithPagination(filter: FilterQuery<IReview>, page: number, limit: number): Promise<{ reviews: IReview[], total: number }> {
+    async findWithPagination(filter: FilterQuery<IReview>, page: number, limit: number): Promise<{ items: IReview[], total: number }> {
         const skip = (page - 1) * limit;
-        const [reviews, total] = await Promise.all([
+        const [items, total] = await Promise.all([
             this._model.find(filter)
                 .populate('appointmentId')
                 .populate({
@@ -107,6 +107,6 @@ export class ReviewRepository extends BaseRepository<IReview> implements IReview
             this._model.countDocuments(filter)
         ]);
 
-        return { reviews, total };
+        return { items, total };
     }
 }

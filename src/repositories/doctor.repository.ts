@@ -1,9 +1,10 @@
+import { FilterQuery, QueryOptions } from 'mongoose';
 import { Doctor, IDoctor } from '../models/doctor.model';
 import { BaseRepository } from './base/base.repository';
 import { IDoctorRepository } from './interfaces/IDoctorRepository';
 
 export class DoctorRepository extends BaseRepository<IDoctor> implements IDoctorRepository {
-    
+
     constructor() {
         super(Doctor);
     }
@@ -24,8 +25,24 @@ export class DoctorRepository extends BaseRepository<IDoctor> implements IDoctor
             .populate({ path: 'profile.specialtyId', model: 'Specialty' });
     }
 
-    async findAll(filter: any = {}, options: any = {}): Promise<IDoctor[]> {
-        return await this._model.find(filter, null, options).populate('userId') as any;
+    async findAll(filter: FilterQuery<IDoctor> = {}, options: QueryOptions = {}): Promise<IDoctor[]> {
+        const doctors = await this._model.find(filter, null, options)
+            .populate('userId')
+            .populate('profile.specialtyId');
+        return doctors as unknown as IDoctor[];
     }
-    
+
+    async findWithPagination(filter: Record<string, unknown>, page: number, limit: number, sort: Record<string, number> = { createdAt: -1 }): Promise<{ items: IDoctor[], total: number }> {
+        const skip = (page - 1) * limit;
+        const [items, total] = await Promise.all([
+            this._model.find(filter as FilterQuery<IDoctor>)
+                .sort(sort as any)
+                .skip(skip)
+                .limit(limit)
+                .populate({ path: 'userId', select: 'username email role profilePic gender phone', model: 'User' })
+                .populate({ path: 'profile.specialtyId', model: 'Specialty' }),
+            this._model.countDocuments(filter as FilterQuery<IDoctor>)
+        ]);
+        return { items: items as unknown as IDoctor[], total };
+    }
 }

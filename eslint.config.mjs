@@ -15,23 +15,40 @@ export default [
       '@typescript-eslint': tsPlugin,
     },
     rules: {
-      // No 'any' type
-      // '@typescript-eslint/no-explicit-any': 'error',
-      
-      // No console.log (only allow warn and error)
+      '@typescript-eslint/no-explicit-any': 'error',
       'no-console': ['error', { allow: ['warn', 'error'] }],
-      
-      // No unused variables
-      '@typescript-eslint/no-unused-vars': ['error', { 
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_' 
-      }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+  // Allowed `any` (per project policy)
+  {
+    files: [
+      'src/errors/app-error.ts',
+      'src/middleware/error-handler.middleware.ts',
+      'src/middleware/upload.middleware.ts',
+      'src/repositories/**/*.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   {
     files: ['src/logger/**/*.ts'],
     rules: {
       'no-console': 'off',
+    },
+  },
+  {
+    files: ['src/utils/test-slot-generation.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
 ];

@@ -1,154 +1,81 @@
-import { Response, NextFunction } from 'express';
+import { Response } from 'express';
 import { IUserService } from '../../services/interfaces/IUserService';
 import { HttpStatus, SuccessMessages } from '../../constants';
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
+import { ApiResponse } from '../../utils/api-response';
+import { UnauthorizedError } from '../../errors/app-error';
+// import { z } from 'zod';
+
+// import { Gender } from '../../enums/gender.enum';
+
+import { UpdateProfileSchema, ProfilePicSchema, OtpSchema, NewEmailSchema, VerifyNewEmailSchema } from '../../dto/user/user.schema';
+
 
 export class UserController {
-
     private readonly _userService: IUserService;
 
     constructor(userService: IUserService) {
         this._userService = userService;
     }
 
-    getProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const user = await this._userService.getUserProfile(userId);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: SuccessMessages.FETCH_SUCCESS,
-                data: user
-            });
-        } catch (error) {
-            next(error);
-        }
+    getProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const user = await this._userService.getUserProfile(userId);
+        res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.FETCH_SUCCESS, user));
     };
 
-    updateProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const user = await this._userService.updateUserProfile(userId, req.body);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: SuccessMessages.USER_UPDATED,
-                data: user
-            });
-        } catch (error) {
-            next(error);
-        }
+    updateProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const validatedData = UpdateProfileSchema.parse(req.body);
+        const user = await this._userService.updateUserProfile(userId, validatedData);
+        res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.USER_UPDATED, user));
     };
 
-    updateProfilePic = async (
-        req: AuthenticatedRequest,
-        res: Response,
-        next: NextFunction
-    ): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const { profilePic } = req.body;
+    updateProfilePic = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
 
-            if (!profilePic) {
-                res.status(HttpStatus.BAD_REQUEST).json({
-                    success: false,
-                    message: "No image provided"
-                });
-                return;
-            }
-
-            const user = await this._userService.updateProfilePic(userId, profilePic);
-
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: SuccessMessages.USER_UPDATED,
-                data: user
-            });
-        } catch (error) {
-            next(error);
-        }
+        const validatedData = ProfilePicSchema.parse(req.body);
+        const user = await this._userService.updateProfilePic(userId, validatedData);
+        res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.USER_UPDATED, user));
     };
 
-    initiateEmailChange = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            await this._userService.initiateEmailChange(userId);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: SuccessMessages.OTP_SENT
-            });
-        } catch (error) {
-            next(error);
-        }
+    initiateEmailChange = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        await this._userService.initiateEmailChange(userId);
+        res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.OTP_SENT));
     };
 
-    verifyCurrentEmail = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const { otp } = req.body;
-            await this._userService.verifyCurrentEmail(userId, otp);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: SuccessMessages.EMAIL_VERIFIED
-            });
-        } catch (error) {
-            next(error);
-        }
+    verifyCurrentEmail = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const validatedData = OtpSchema.parse(req.body);
+        await this._userService.verifyCurrentEmail(userId, validatedData);
+        res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.EMAIL_VERIFIED));
     };
 
-    sendOtpToNewEmail = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const { newEmail } = req.body;
-            await this._userService.sendOtpToNewEmail(userId, newEmail);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: SuccessMessages.OTP_SENT
-            });
-        } catch (error) {
-            next(error);
-        }
+    sendOtpToNewEmail = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const validatedData = NewEmailSchema.parse(req.body);
+        await this._userService.sendOtpToNewEmail(userId, validatedData);
+        res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.OTP_SENT));
     };
 
-    verifyNewEmail = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-                return;
-            }
-            const { newEmail, otp } = req.body;
-            const user = await this._userService.verifyNewEmail(userId, newEmail, otp);
-            res.status(HttpStatus.OK).json({
-                success: true,
-                message: SuccessMessages.USER_UPDATED,
-                data: user
-            });
-        } catch (error) {
-            next(error);
-        }
+    verifyNewEmail = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
+
+        const validatedData = VerifyNewEmailSchema.parse(req.body);
+        const user = await this._userService.verifyNewEmail(userId, validatedData);
+        res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.USER_UPDATED, user));
     };
 }

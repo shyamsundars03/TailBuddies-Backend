@@ -1,8 +1,14 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { ISlotService } from '../../services/interfaces/ISlotService';
 import { HttpStatus } from '../../constants';
-import logger from '../../logger';
-import { AuthRequest } from '../../middleware/auth.middleware';
+import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
+import { ApiResponse } from '../../utils/api-response';
+import { UnauthorizedError } from '../../errors/app-error';
+import { z } from 'zod';
+
+const BatchSlotSchema = z.object({
+    slotIds: z.array(z.string()).min(1, "At least one slot ID is required"),
+});
 
 export class SlotController {
     private readonly _slotService: ISlotService;
@@ -11,55 +17,21 @@ export class SlotController {
         this._slotService = slotService;
     }
 
-    blockSlots = async (req: AuthRequest, res: Response) => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                return res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-            }
+    blockSlots = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
 
-            const { slotIds } = req.body;
-            if (!slotIds || !Array.isArray(slotIds) || slotIds.length === 0) {
-                return res.status(HttpStatus.BAD_REQUEST).json({ success: false, message: 'Slot IDs are required' });
-            }
-
-            const result = await this._slotService.blockSlots(userId, slotIds);
-            if (result.success) {
-                return res.status(HttpStatus.OK).json(result);
-            }
-            return res.status(HttpStatus.BAD_REQUEST).json(result);
-        } catch (error: any) {
-            logger.error('Controller error blocking slots', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message || 'Internal server error',
-            });
-        }
+        const { slotIds } = BatchSlotSchema.parse(req.body);
+        const result = await this._slotService.blockSlots(userId, slotIds);
+        res.status(HttpStatus.OK).json(ApiResponse.success(result.message || 'Slots blocked successfully', result));
     };
 
-    unblockSlots = async (req: AuthRequest, res: Response) => {
-        try {
-            const userId = req.user?.userId;
-            if (!userId) {
-                return res.status(HttpStatus.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
-            }
+    unblockSlots = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+        const userId = req.user?.userId;
+        if (!userId) throw new UnauthorizedError();
 
-            const { slotIds } = req.body;
-            if (!slotIds || !Array.isArray(slotIds) || slotIds.length === 0) {
-                return res.status(HttpStatus.BAD_REQUEST).json({ success: false, message: 'Slot IDs are required' });
-            }
-
-            const result = await this._slotService.unblockSlots(userId, slotIds);
-            if (result.success) {
-                return res.status(HttpStatus.OK).json(result);
-            }
-            return res.status(HttpStatus.BAD_REQUEST).json(result);
-        } catch (error: any) {
-            logger.error('Controller error unblocking slots', { error: error.message });
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                success: false,
-                message: error.message || 'Internal server error',
-            });
-        }
+        const { slotIds } = BatchSlotSchema.parse(req.body);
+        const result = await this._slotService.unblockSlots(userId, slotIds);
+        res.status(HttpStatus.OK).json(ApiResponse.success(result.message || 'Slots unblocked successfully', result));
     };
 }

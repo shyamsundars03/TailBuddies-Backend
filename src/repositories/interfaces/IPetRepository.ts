@@ -16,5 +16,6 @@ export interface IPetRepository {
    
    
     deletePet(id: string): Promise<boolean>;
-    findIdsByName(name: string): Promise<string[]>;
+    findIdsBySearch(search: string, ownerId?: string): Promise<string[]>;
+    countDocuments(query?: Record<string, unknown>): Promise<number>;
 }

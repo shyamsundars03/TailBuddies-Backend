@@ -1,10 +1,13 @@
-import { Router } from 'express';
-import { ChatController } from '../controllers/chat.controller';
+import { Router, RequestHandler } from 'express';
+import { chatController } from '../config/di';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
-const chatController = new ChatController();
 
-router.get('/:appointmentId', authMiddleware as any, chatController.getChatHistory);
+router.get(
+    '/:appointmentId',
+    authMiddleware as unknown as RequestHandler,
+    chatController.getChatHistory
+);
 
 export default router;

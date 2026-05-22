@@ -16,7 +16,7 @@ export class NotificationRepository implements INotificationRepository {
     }
 
     async findByUserId(userId: string, status?: string): Promise<INotification[]> {
-        const query: any = { recipientId: new mongoose.Types.ObjectId(userId) };
+        const query: Record<string, unknown> = { recipientId: new mongoose.Types.ObjectId(userId) };
         if (status) query.status = status;
         return await Notification.find(query).sort({ createdAt: -1 });
     }

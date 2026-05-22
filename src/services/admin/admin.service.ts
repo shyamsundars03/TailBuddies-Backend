@@ -1,4 +1,3 @@
-import Admin from '../../models/admin.model';
 import { IJwtService } from '../interfaces/IJwtService';
 import { ErrorMessages } from '../../constants';
 import logger from '../../logger';
@@ -8,246 +7,148 @@ import { IUserRepository } from '../../repositories/interfaces/IUserRepository';
 import { ISpecialty } from '../../models/specialty.model';
 import { IUser } from '../../models/user.models';
 import { UserRole } from '../../enums/user-role.enum';
-
-export interface AdminLoginDto {
-    email: string;
-    password: string;
-}
-
-export interface AdminLoginResponseDto {
-    id: string;
-    email: string;
-    role: string;
-    accessToken: string;
-    refreshToken: string;
-}
+import { IDoctorRepository } from '../../repositories/interfaces/IDoctorRepository';
+import { UnauthorizedError, ConflictError, NotFoundError } from '../../errors/app-error';
+import { IAdminRepository } from '../../repositories/interfaces/IAdminRepository';
+import { AdminLoginDto, AdminLoginResponseDto } from '../../dto/admin/admin-login.dto';
+import { 
+  GetSpecialtiesInput, 
+  GetUsersInput, 
+  CreateSpecialtyInput, 
+  UpdateSpecialtyInput 
+} from '../../dto/admin/admin.schema';
 
 export class AdminService implements IAdminService {
+  private readonly _jwtService: IJwtService;
+  private readonly _specialtyRepository: ISpecialtyRepository;
+  private readonly _userRepository: IUserRepository;
+  private readonly _adminRepository: IAdminRepository;
+  private readonly _doctorRepository: IDoctorRepository;
 
+  constructor(
+    jwtService: IJwtService,
+    specialtyRepository: ISpecialtyRepository,
+    userRepository: IUserRepository,
+    adminRepository: IAdminRepository,
+    doctorRepository: IDoctorRepository
+  ) {
+    this._jwtService = jwtService;
+    this._specialtyRepository = specialtyRepository;
+    this._userRepository = userRepository;
+    this._adminRepository = adminRepository;
+    this._doctorRepository = doctorRepository;
+  }
 
+  async adminLogin(data: AdminLoginDto): Promise<AdminLoginResponseDto> {
+    const { email, password } = data;
+    const adminCount = await this._adminRepository.countDocuments();
 
-    private readonly _jwtService: IJwtService;
-    private readonly _specialtyRepository: ISpecialtyRepository;
-    private readonly _userRepository: IUserRepository;
+    if (adminCount === 0) {
+      logger.info('No admin found. Creating first admin account.', { email });
+      const newAdmin = await this._adminRepository.save({ email, password });
 
-    constructor(
-        jwtService: IJwtService,
-        specialtyRepository: ISpecialtyRepository,
-        userRepository: IUserRepository
-    ) {
-        this._jwtService = jwtService;
-        this._specialtyRepository = specialtyRepository;
-        this._userRepository = userRepository;
+      const accessToken = this._jwtService.generateAccessToken({ userId: newAdmin.id, role: 'admin' });
+      const refreshToken = this._jwtService.generateRefreshToken({ userId: newAdmin.id });
+
+      return {
+        id: newAdmin.id,
+        email: newAdmin.email,
+        role: 'admin',
+        accessToken,
+        refreshToken,
+      };
     }
 
-
-
-
-    async adminLogin(data: AdminLoginDto): Promise<AdminLoginResponseDto> {
-
-
-
-        const { email, password } = data;
-        const adminCount = await Admin.countDocuments();
-
-
-        if (adminCount === 0) {
-            logger.info('No admin found. Creating first admin account.', { email });
-            const newAdmin = new Admin({ email, password });
-            await newAdmin.save();
-
-
-
-            const accessToken = this._jwtService.generateAccessToken({ userId: newAdmin.id, role: 'admin' });
-            const refreshToken = this._jwtService.generateRefreshToken({ userId: newAdmin.id });
-
-
-
-            return {
-                id: newAdmin.id,
-                email: newAdmin.email,
-                role: 'admin',
-                accessToken,
-                refreshToken,
-            };
-        }
-
-        const admin = await Admin.findOne({ email: email.toLowerCase() });
-
-        if (!admin) {
-            throw new Error(ErrorMessages.ADMIN_INVALID_CREDENTIALS);
-        }
-
-
-        const isMatch = await admin.comparePassword(password);
-        if (!isMatch) {
-            throw new Error(ErrorMessages.ADMIN_INVALID_CREDENTIALS);
-        }
-
-
-        const accessToken = this._jwtService.generateAccessToken({ userId: admin.id, role: 'admin' });
-        const refreshToken = this._jwtService.generateRefreshToken({ userId: admin.id });
-
-
-        logger.info('Admin login successful', { adminId: admin.id });
-
-        return {
-            id: admin.id,
-            email: admin.email,
-            role: 'admin',
-            accessToken,
-            refreshToken,
-        };
+    const admin = await this._adminRepository.findOne({ email: email.toLowerCase() });
+    if (!admin) {
+      throw new UnauthorizedError(ErrorMessages.ADMIN_INVALID_CREDENTIALS);
     }
 
-
-
-
-
-// Specialty Management
-    async createSpecialty(data: Partial<ISpecialty>): Promise<ISpecialty> {
-
-        if (!data.name) {
-            throw new Error("Specialty name is required");
-        }
-
-        
-        const existing = await this._specialtyRepository.findOne({
-            name: { $regex: new RegExp(`^${data.name}$`, "i") }
-        });
-
-        if (existing) {
-            throw new Error("Specialty with this name already exists");
-        }
-
-        return await this._specialtyRepository.create(data);
+    const isMatch = await admin.comparePassword(password);
+    if (!isMatch) {
+      throw new UnauthorizedError(ErrorMessages.ADMIN_INVALID_CREDENTIALS);
     }
 
+    const accessToken = this._jwtService.generateAccessToken({ userId: admin.id, role: 'admin' });
+    const refreshToken = this._jwtService.generateRefreshToken({ userId: admin.id });
 
+    logger.info('Admin login successful', { adminId: admin.id });
 
+    return {
+      id: admin.id,
+      email: admin.email,
+      role: 'admin',
+      accessToken,
+      refreshToken,
+    };
+  }
 
-    async getSpecialties(page: number, limit: number, search?: string): Promise<{ specialties: ISpecialty[], total: number }> {
-        const filter: any = {};
-        if (search) {
-            filter.name = { $regex: search, $options: 'i' };
-        }
-        const options = {
-            skip: (page - 1) * limit,
-            limit: limit,
-            sort: { createdAt: -1 }
-        };
-        const specialties = await this._specialtyRepository.findAll(filter, options);
-        
-
-
-        const total = await (this._specialtyRepository as unknown as { _model: { countDocuments: Function } })._model.countDocuments(filter);
-        
-        
-        return { specialties, total };
+  // Specialty Management
+  async createSpecialty(data: CreateSpecialtyInput): Promise<ISpecialty> {
+    const existing = await this._specialtyRepository.findByName(data.name);
+    if (existing) {
+      throw new ConflictError("Specialty with this name already exists");
     }
+    return await this._specialtyRepository.create(data);
+  }
 
-    async updateSpecialty(id: string, data: Partial<ISpecialty>): Promise<ISpecialty | null> {
-        return await this._specialtyRepository.update(id, data);
+  async getSpecialties(data: GetSpecialtiesInput): Promise<{ specialties: ISpecialty[], total: number }> {
+    return await this._specialtyRepository.findWithFilters(data.page, data.limit, data.search);
+  }
+
+  async updateSpecialty(id: string, data: UpdateSpecialtyInput): Promise<ISpecialty | null> {
+    if (data.name) {
+      const existing = await this._specialtyRepository.findByName(data.name);
+      if (existing && existing._id.toString() !== id) {
+        throw new ConflictError("Specialty with this name already exists");
+      }
     }
+    return await this._specialtyRepository.update(id, data);
+  }
 
-    async deleteSpecialty(id: string): Promise<boolean> {
-        return await this._specialtyRepository.delete(id);
-    }
+  async deleteSpecialty(id: string): Promise<boolean> {
+    return await this._specialtyRepository.delete(id);
+  }
 
+  // User Management
+  async getUsers(data: GetUsersInput): Promise<{ users: IUser[], total: number }> {
+    return await this._userRepository.findWithFilters(data.page, data.limit, data.role, data.search);
+  }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // User Management
-    async getUsers(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number }> {
-        const filter: Record<string, any> = {};
-        if (role) filter.role = role;
-        if (search) {
-            filter.$or = [
-                { username: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } }
-            ];
-        }
-        const options = {
-            skip: (page - 1) * limit,
-            limit: limit,
-            sort: { createdAt: -1 }
-        };
-        const users = await this._userRepository.findAll(filter, options);
-        const total = await (this._userRepository as any)._model.countDocuments(filter);
-        return { users, total };
-    }
-
-    async getUsersWithDetails(page: number, limit: number, role?: string, search?: string): Promise<{ users: IUser[], total: number, ownerCount: number, doctorCount: number }> {
-        const filter: Record<string, any> = {};
-        if (role) filter.role = role;
-
-        if (search) {
-            filter.$or = [
-                { username: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } }
-            ];
-        }
-
-        const options = {
-            skip: (page - 1) * limit,
-            limit: limit,
-            sort: { createdAt: -1 }
-        };
-
-        const users = await this._userRepository.findAll(filter, options);
-
-        // Fetch doctor details for doctors to get their specialty
-        const usersWithDetails = await Promise.all(users.map(async (user: any) => {
-            const userData = user.toObject ? user.toObject() : user;
-            if (userData.role === UserRole.DOCTOR) {
-                const { Doctor } = require('../../models/doctor.model');
-                const doctor = await Doctor.findOne({ userId: userData._id })
-                    .populate('profile.specialtyId');
-                
-                return {
-                    ...userData,
-                    id: userData._id.toString(),
-                    specialty: doctor?.profile?.specialtyId?.name || 'Not Set'
-                };
-            }
-            return {
-                ...userData,
-                id: userData._id.toString()
-            };
-        }));
-
-        const userModel = (this._userRepository as unknown as { _model: { countDocuments: Function } })._model;
-        const total = await userModel.countDocuments(filter);
-        const ownerCount = await userModel.countDocuments({ role: UserRole.OWNER });
-        const doctorCount = await userModel.countDocuments({ role: UserRole.DOCTOR });
-
-        return { users: usersWithDetails, total, ownerCount, doctorCount };
-    }
-
-
-
-    async toggleUserBlock(id: string): Promise<IUser | null> {
-        const user = await this._userRepository.findById(id);
-        if (!user) return null;
-        return await this._userRepository.update(id, { isBlocked: !user.isBlocked });
-    }
-
+  async getUsersWithDetails(data: GetUsersInput): Promise<{ users: Array<IUser & { id: string, specialty?: string }>, total: number, ownerCount: number, doctorCount: number }> {
+    const { page, limit, role, search } = data;
     
+    const { users, total } = await this._userRepository.findWithFilters(page, limit, role, search);
+
+    const usersWithDetails = await Promise.all(users.map(async (user: IUser) => {
+      const userData = user.toObject ? user.toObject() : user;
+      const userId = userData.id || userData._id.toString();
+      
+      if (userData.role === UserRole.DOCTOR) {
+        const doctor = await this._doctorRepository.findByUserIdWithDetails(userId);
+        const specialtyName = (doctor?.profile?.specialtyId as unknown as { name: string })?.name || 'Not Set';
+        
+        return {
+          ...userData,
+          id: userId,
+          specialty: specialtyName
+        };
+      }
+      return {
+        ...userData,
+        id: userId
+      };
+    }));
+
+    const ownerCount = await this._userRepository.countDocuments({ role: UserRole.OWNER });
+    const doctorCount = await this._userRepository.countDocuments({ role: UserRole.DOCTOR });
+
+    return { users: usersWithDetails, total, ownerCount, doctorCount };
+  }
+
+  async toggleUserBlock(id: string): Promise<IUser | null> {
+    const user = await this._userRepository.findById(id);
+    if (!user) throw new NotFoundError('User not found');
+    return await this._userRepository.update(id, { isBlocked: !user.isBlocked });
+  }
 }

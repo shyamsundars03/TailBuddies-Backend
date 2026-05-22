@@ -1,12 +1,11 @@
 import { RtcTokenBuilder, RtcRole, RtmTokenBuilder } from 'agora-token';
-import crypto from 'crypto';
 
 import { env } from '../config/env';
 import logger from '../logger';
 
 export class AgoraService {
 
-    private static stringToUid(uid: any): number {
+    private static stringToUid(uid: string | number): number {
         if (typeof uid === 'number') return uid >>> 0;
         if (!uid || uid === '0') return 0;
 
@@ -37,15 +36,15 @@ export class AgoraService {
             const appId = (process.env.AGORA_APP_ID || '').trim();
             const appCertificate = (process.env.AGORA_APP_CERTIFICATE || '').trim();
 
-            console.log("Agora Credentials Check:", {
-                appIdPrefix: appId.substring(0, 4) + "...",
-                certPrefix: appCertificate.substring(0, 4) + "...",
+            logger.debug('Agora credentials check', {
+                appIdPrefix: `${appId.substring(0, 4)}...`,
+                certPrefix: `${appCertificate.substring(0, 4)}...`,
                 appIdLength: appId.length,
-                certLength: appCertificate.length
+                certLength: appCertificate.length,
             });
 
             if (!appId || !appCertificate) {
-                console.error("CRITICAL: Agora App ID or Certificate is MISSING in environment variables!");
+                logger.error('Agora App ID or Certificate is missing in environment variables');
             }
 
 

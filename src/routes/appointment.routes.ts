@@ -1,41 +1,44 @@
 import { Router } from 'express';
 import { appointmentController } from '../config/di';
 import { authMiddleware } from '../middleware/auth.middleware';
-
-import logger from '../logger';
+import { ownerOnly, doctorOnly, adminOnly } from '../middleware/role.middleware';
+import { validateRequest, validateQuery } from '../middleware/zod-validation.middleware';
+import {
+    CreateAppointmentSchema,
+    UpdateAppointmentStatusSchema,
+    CheckInSchema,
+    CancelAppointmentSchema,
+    GetAvailableSlotsQuerySchema,
+} from '../dto/appointment/appointment.schema';
 
 const router = Router();
-logger.info('Appointment Routes Loading...');
 
-// Doctor routes (Move to top for priority)
-router.get('/doctor/slots', authMiddleware, appointmentController.getDoctorSlots);
-router.get('/doctor/patients', authMiddleware, appointmentController.getPatientsByDoctor);
-router.get('/doctor/stats', authMiddleware, appointmentController.getStats);
-router.get('/doctor', authMiddleware, appointmentController.getDoctorAppointments);
+router.use(authMiddleware);
+
+// Doctor routes
+router.get('/doctor/slots', doctorOnly, appointmentController.getDoctorSlots);
+router.get('/doctor/patients', doctorOnly, appointmentController.getPatientsByDoctor);
+router.get('/doctor/stats', doctorOnly, appointmentController.getStats);
+router.get('/doctor', doctorOnly, appointmentController.getDoctorAppointments);
 
 // Admin routes
-router.get('/all', authMiddleware, appointmentController.getAll);
+router.get('/all', adminOnly, appointmentController.getAll);
 
 // Owner routes
-router.get('/', authMiddleware, appointmentController.getOwnerAppointments);
-router.get('/owner/stats', authMiddleware, appointmentController.getOwnerStats);
-router.post('/:id/cancel-pending', authMiddleware, appointmentController.cancelPendingAppointment);
+router.get('/', ownerOnly, appointmentController.getOwnerAppointments);
+router.get('/owner/stats', ownerOnly, appointmentController.getOwnerStats);
+router.post('/', ownerOnly, validateRequest(CreateAppointmentSchema), appointmentController.create);
+router.post('/:id/cancel-pending', ownerOnly, appointmentController.cancelPendingAppointment);
 
+// Owner booking
+router.get('/slots', ownerOnly, validateQuery(GetAvailableSlotsQuerySchema), appointmentController.getAvailableSlots);
 
-// Single Appointment
-router.get('/slots', authMiddleware, appointmentController.getAvailableSlots);
-router.get('/:id/check-slot', authMiddleware, appointmentController.checkSlotAvailability);
-router.get('/:id', authMiddleware, appointmentController.getById);
-
-// Booking
-router.post('/', authMiddleware, appointmentController.create);
-
-// Management
-router.patch('/:id/status', authMiddleware, appointmentController.updateStatus);
-router.post('/:id/cancel', authMiddleware, appointmentController.cancel);
-
-// Check-in/out
-router.post('/:id/check-in', authMiddleware, appointmentController.checkIn);
-router.post('/:id/check-out', authMiddleware, appointmentController.checkOut);
+// Shared (authenticated)
+router.get('/:id/check-slot', appointmentController.checkSlotAvailability);
+router.get('/:id', appointmentController.getById);
+router.patch('/:id/status', doctorOnly, validateRequest(UpdateAppointmentStatusSchema), appointmentController.updateStatus);
+router.post('/:id/cancel', validateRequest(CancelAppointmentSchema), appointmentController.cancel);
+router.post('/:id/check-in', validateRequest(CheckInSchema), appointmentController.checkIn);
+router.post('/:id/check-out', validateRequest(CheckInSchema), appointmentController.checkOut);
 
 export default router;
