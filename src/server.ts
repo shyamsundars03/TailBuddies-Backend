@@ -1,3 +1,5 @@
+process.env.TZ = 'Asia/Kolkata';
+
 import app from './app';
 import { env } from './config/env';
 import logger from './logger';
