@@ -43,6 +43,18 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
       .sort({ createdAt: -1 }); // Recently created first
   }
 
+
+// async countAppts(query:Record<string, unknown>): Promise<{ items: IAppointment[], total: number }>  {
+
+
+
+// const numOfCancelled = 
+
+
+
+// }
+
+
   async findWithPagination(query: Record<string, unknown>, page: number, limit: number): Promise<{ items: IAppointment[], total: number }> {
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([

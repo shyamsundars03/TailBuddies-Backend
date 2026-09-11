@@ -6,7 +6,9 @@ export interface IAppointmentRepository extends IBaseRepository<IAppointment> {
   findWithDetails(query: Record<string, unknown>): Promise<IAppointment[]>;
   findWithPagination(query: Record<string, unknown>, page: number, limit: number): Promise<{ items: IAppointment[], total: number }>;
   countDocuments(query?: Record<string, unknown>): Promise<number>;
+  // countAppts(query?: Record<string, unknown>): Promise<{ items: IAppointment[], total: number }>;
 
+  // findAllAppoinments(: <String>: Promise<IAppointment[]>);
   // Analytics
   getRevenueStats(match: Record<string, unknown>, idConfig: Record<string, unknown>, labelFormat: string): Promise<unknown[]>;
   getReportsData(match: Record<string, unknown>, search?: string, specialtyId?: string, skip?: number, limit?: number): Promise<unknown>;

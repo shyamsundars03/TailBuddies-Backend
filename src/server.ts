@@ -11,6 +11,8 @@ import { Server } from 'socket.io';
 import { SocketService } from './services/socket.service';
 import { chatService } from './config/di';
 
+import { isOriginAllowed } from './config/cors.config';
+
 const PORT = env.port;
 
 const startServer = async () => {
@@ -20,7 +22,13 @@ const startServer = async () => {
     const httpServer = http.createServer(app);
     const io = new Server(httpServer, {
       cors: {
-        origin: env.frontendUrl || 'http://localhost:3000',
+        origin: (origin, callback) => {
+          if (isOriginAllowed(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        },
         credentials: true,
       },
     });

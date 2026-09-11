@@ -141,6 +141,8 @@ export class AppointmentService implements IAppointmentService {
 
 // console.log(doctor)
 
+
+
             if (!doctor) throw new NotFoundError('Doctor not found');
 
             if (!doctor.isActive || !doctor.isVerified || doctor.profileStatus !== 'verified') {
@@ -159,6 +161,12 @@ export class AppointmentService implements IAppointmentService {
             }
 
 
+            // const APPTS =  await this._appointmentRepository.findById(data.ownerId)
+
+            // const cancelledCount = await this._appointmentRepository.
+
+
+
 
 
             const slot = await Slot.findById(data.slotId).session(session);
@@ -171,6 +179,10 @@ export class AppointmentService implements IAppointmentService {
 
             const appDateOnly = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
             const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+
+
+
 
             if (appDateOnly < todayDateOnly) {
                 throw new ValidationError('Cannot book an appointment in the past');

@@ -22,15 +22,14 @@ import slotRoutes from './routes/slot.routes';
 import { errorHandler } from './middleware/error-handler.middleware';
 
 
-const app = express();
+import { corsOptions } from './config/cors.config';
 
+const app = express();
 
 // Middleware
 app.use(cookieParser());
-app.use(cors({
-  origin: env.frontendUrl || 'http://localhost:3000' ,
-  credentials: true,
-}));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -86,4 +85,4 @@ app.use(errorHandler);
 
 
 
-export default app;
+export default app;
