@@ -3,7 +3,7 @@ import { INotificationService } from '../services/notification.service';
 import { HttpStatus } from '../constants';
 import { AuthenticatedRequest } from '../interfaces/express-request.interface';
 import { ApiResponse } from '../utils/api-response';
-import { UnauthorizedError } from '../errors/app-error';
+
 
 export class NotificationController {
     private readonly _notificationService: INotificationService;
@@ -13,8 +13,7 @@ export class NotificationController {
     }
 
     getUserNotifications = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const status = req.query.status as string | undefined;
         const notifications = await this._notificationService.getNotifications(userId, status);
@@ -29,8 +28,7 @@ export class NotificationController {
     };
 
     markAllRead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         await this._notificationService.markAllAsRead(userId);
         res.status(HttpStatus.OK).json(ApiResponse.success('All notifications marked as read'));

@@ -3,7 +3,7 @@ import { IUserService } from '../../services/interfaces/IUserService';
 import { HttpStatus, SuccessMessages } from '../../constants';
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 import { ApiResponse } from '../../utils/api-response';
-import { UnauthorizedError } from '../../errors/app-error';
+
 // import { z } from 'zod';
 
 // import { Gender } from '../../enums/gender.enum';
@@ -19,16 +19,14 @@ export class UserController {
     }
 
     getProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const user = await this._userService.getUserProfile(userId);
         res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.FETCH_SUCCESS, user));
     };
 
     updateProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const validatedData = UpdateProfileSchema.parse(req.body);
         const user = await this._userService.updateUserProfile(userId, validatedData);
@@ -36,8 +34,7 @@ export class UserController {
     };
 
     updateProfilePic = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const validatedData = ProfilePicSchema.parse(req.body);
         const user = await this._userService.updateProfilePic(userId, validatedData);
@@ -45,16 +42,14 @@ export class UserController {
     };
 
     initiateEmailChange = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         await this._userService.initiateEmailChange(userId);
         res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.OTP_SENT));
     };
 
     verifyCurrentEmail = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const validatedData = OtpSchema.parse(req.body);
         await this._userService.verifyCurrentEmail(userId, validatedData);
@@ -62,8 +57,7 @@ export class UserController {
     };
 
     sendOtpToNewEmail = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const validatedData = NewEmailSchema.parse(req.body);
         await this._userService.sendOtpToNewEmail(userId, validatedData);
@@ -71,8 +65,7 @@ export class UserController {
     };
 
     verifyNewEmail = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const validatedData = VerifyNewEmailSchema.parse(req.body);
         const user = await this._userService.verifyNewEmail(userId, validatedData);

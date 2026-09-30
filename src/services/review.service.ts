@@ -54,7 +54,7 @@ export class ReviewService implements IReviewService {
     async createReview(ownerId: string, data: ReviewInput): Promise<IReview> {
         const { appointmentId, rating, comment } = data;
 
-        const appointment = await this._appointmentRepository.findById(appointmentId);
+        const appointment = await this._appointmentRepository.findAppointmentById(appointmentId);
         if (!appointment) {
             throw new NotFoundError('Appointment not found');
         }

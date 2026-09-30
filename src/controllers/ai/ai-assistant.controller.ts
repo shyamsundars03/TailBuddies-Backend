@@ -3,7 +3,6 @@ import { IAiAssistantService } from '../../services/interfaces/IAiAssistantServi
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 import { ApiResponse } from '../../utils/api-response';
 import { HttpStatus } from '../../constants';
-import { UnauthorizedError } from '../../errors/app-error';
 import { AnalyzeIssueInput } from '../../dto/ai/ai.schema';
 
 export class AiAssistantController {
@@ -14,8 +13,7 @@ export class AiAssistantController {
     }
 
     analyze = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const { category, petId, description } = req.body as AnalyzeIssueInput;
 

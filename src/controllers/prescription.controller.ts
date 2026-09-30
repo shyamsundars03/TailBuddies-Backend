@@ -4,7 +4,7 @@ import { AuthenticatedRequest } from '../interfaces/express-request.interface';
 import { HttpStatus } from '../constants';
 import { ApiResponse } from '../utils/api-response';
 import { CreatePrescriptionInput } from '../services/interfaces/IPrescriptionService';
-import { UnauthorizedError } from '../errors/app-error';
+
 
 export class PrescriptionController {
     private readonly _prescriptionService: IPrescriptionService;
@@ -14,8 +14,7 @@ export class PrescriptionController {
     }
 
     createPrescription = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const vetId = req.user?.userId;
-        if (!vetId) throw new UnauthorizedError();
+        const vetId = req.user!.userId;
 
         const result = await this._prescriptionService.createPrescription({
             ...(req.body as CreatePrescriptionInput),
@@ -25,9 +24,8 @@ export class PrescriptionController {
     };
 
     getPrescriptionByAppointmentId = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        const role = req.user?.role;
-        if (!userId || !role) throw new UnauthorizedError();
+        const userId = req.user!.userId;
+        const role = req.user!.role;
 
         const appointmentId = req.params.appointmentId as string;
         const result = await this._prescriptionService.getPrescriptionByAppointmentId(userId, role, appointmentId);
@@ -35,9 +33,8 @@ export class PrescriptionController {
     };
 
     getPrescriptionById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        const role = req.user?.role;
-        if (!userId || !role) throw new UnauthorizedError();
+        const userId = req.user!.userId;
+        const role = req.user!.role;
 
         const id = req.params.id as string;
         const result = await this._prescriptionService.getPrescriptionById(userId, role, id);
@@ -45,9 +42,8 @@ export class PrescriptionController {
     };
 
     downloadPdf = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        const role = req.user?.role;
-        if (!userId || !role) throw new UnauthorizedError();
+        const userId = req.user!.userId;
+        const role = req.user!.role;
 
         const id = req.params.id as string;
         const { data, filename } = await this._prescriptionService.generatePrescriptionPdf(userId, role, id);

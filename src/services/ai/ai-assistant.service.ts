@@ -8,7 +8,7 @@ import { IAiAssistantService, AiAnalysisResult } from "../interfaces/IAiAssistan
 
 export class AiAssistantService implements IAiAssistantService {
     private groq: Groq;
-    private model: string = "llama-3.3-70b-versatile";
+    private model: string = "openai/gpt-oss-120b";
 
     constructor(
         private petRepository: IPetRepository,
@@ -66,10 +66,13 @@ export class AiAssistantService implements IAiAssistantService {
         const content = chatCompletion.choices[0]?.message?.content || "";
         
         const specialtyMatch = content.match(/SPECIALTY:\s*(.*)/i);
-        const planMatch = content.split(/---/i)[1]?.replace(/PLAN:\s*/i, '');
+        
+        // Find the first separator and take everything after it (plan may contain its own --- lines)
+        const separatorIndex = content.indexOf('---');
+        const afterSeparator = separatorIndex !== -1 ? content.slice(separatorIndex + 3) : content;
+        const carePlan = afterSeparator.replace(/^[\s\n]*PLAN:\s*/i, '').trim();
         
         const specialtyName = specialtyMatch ? specialtyMatch[1].trim() : "General Vet";
-        const carePlan = planMatch ? planMatch.trim() : content;
 
         // 4. Find matching Specialty ID & Doctors
         let doctors: IDoctor[] = [];

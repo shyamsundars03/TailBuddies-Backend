@@ -2,9 +2,8 @@ import { Request, Response } from 'express';
 import { IAuthService } from '../../services/interfaces/IAuthService';
 import { HttpStatus, SuccessMessages } from '../../constants';
 import { ApiResponse } from '../../utils/api-response';
-import { env } from '../../config/env';
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
-import { UnauthorizedError } from '../../errors/app-error';
+import { setRefreshTokenCookie, clearRefreshTokenCookie } from '../../utils/cookie.util';
 
 export class AuthController {
   private readonly _authService: IAuthService;
@@ -15,13 +14,7 @@ export class AuthController {
 
   login = async (req: Request, res: Response): Promise<void> => {
     const result = await this._authService.login(req.body);
-
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: env.jwtRefreshMaxAge,
-    });
+    setRefreshTokenCookie(res, result.refreshToken);
 
     res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.LOGIN, {
       user: {
@@ -44,13 +37,7 @@ export class AuthController {
 
   googleLogin = async (req: Request, res: Response): Promise<void> => {
     const result = await this._authService.googleLogin(req.body);
-
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: env.jwtRefreshMaxAge,
-    });
+    setRefreshTokenCookie(res, result.refreshToken);
 
     res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.LOGIN, {
       user: {
@@ -68,13 +55,7 @@ export class AuthController {
 
   verifyOtp = async (req: Request, res: Response): Promise<void> => {
     const result = await this._authService.verifyOtp(req.body);
-
-    res.cookie('refreshToken', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: env.jwtRefreshMaxAge,
-    });
+    setRefreshTokenCookie(res, result.refreshToken);
 
     res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.OTP_VERIFIED, {
       user: {
@@ -106,8 +87,7 @@ export class AuthController {
   };
 
   changePassword = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    const userId = req.user?.userId;
-    if (!userId) throw new UnauthorizedError();
+    const userId = req.user!.userId;
     
     await this._authService.changePassword(userId, req.body);
     res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.PASSWORD_CHANGED));
@@ -120,11 +100,7 @@ export class AuthController {
   };
 
   logout = async (req: Request, res: Response): Promise<void> => {
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-    });
+    clearRefreshTokenCookie(res);
     res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.LOGOUT));
   };
 }

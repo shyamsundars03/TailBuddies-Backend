@@ -12,7 +12,7 @@ export class AppointmentRepository extends BaseRepository<IAppointment> implemen
     super(Appointment);
   }
 
-  async findById(id: string): Promise<IAppointment | null> {
+  async findAppointmentById(id: string): Promise<IAppointment | null> {
     return await this._model.findById(id)
       .populate('ownerId', 'username email phone')
       .populate({

@@ -3,7 +3,6 @@ import { ISlotService } from '../../services/interfaces/ISlotService';
 import { HttpStatus } from '../../constants';
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 import { ApiResponse } from '../../utils/api-response';
-import { UnauthorizedError } from '../../errors/app-error';
 import { z } from 'zod';
 
 const BatchSlotSchema = z.object({
@@ -18,8 +17,7 @@ export class SlotController {
     }
 
     blockSlots = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const { slotIds } = BatchSlotSchema.parse(req.body);
         const result = await this._slotService.blockSlots(userId, slotIds);
@@ -27,8 +25,7 @@ export class SlotController {
     };
 
     unblockSlots = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const { slotIds } = BatchSlotSchema.parse(req.body);
         const result = await this._slotService.unblockSlots(userId, slotIds);

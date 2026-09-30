@@ -86,7 +86,7 @@ export class PrescriptionService implements IPrescriptionService {
         } as unknown as Partial<import('../models/appointment.model').IAppointment>);
 
         try {
-            const appointment = await this._appointmentRepository.findById(data.appointmentId);
+            const appointment = await this._appointmentRepository.findAppointmentById(data.appointmentId);
             if (appointment) {
                 await this._notificationService.createNotification(
                     appointment.ownerId.toString(),
@@ -113,7 +113,7 @@ export class PrescriptionService implements IPrescriptionService {
     async getPrescriptionByAppointmentId(userId: string, role: string, appointmentId: string): Promise<IPrescription> {
         await this.assertPrescriptionAccess(appointmentId, userId, role);
 
-        const appointment = await this._appointmentRepository.findById(appointmentId);
+        const appointment = await this._appointmentRepository.findAppointmentById(appointmentId);
         if (appointment && appointment.prescriptionId) {
             const populatedPrescription = asPopulatedPrescription(appointment.prescriptionId);
             if (populatedPrescription) {
@@ -128,7 +128,7 @@ export class PrescriptionService implements IPrescriptionService {
                 }
             }
 
-            const prescription = await this._prescriptionRepository.findById(idToUse);
+            const prescription = await this._prescriptionRepository.findPrescriptionById(idToUse);
             if (prescription) return prescription;
         }
 
@@ -181,9 +181,9 @@ export class PrescriptionService implements IPrescriptionService {
         }
 
         if (!prescription && mongoose.Types.ObjectId.isValid(idToUse)) {
-            const appointment = await this._appointmentRepository.findById(idToUse);
+            const appointment = await this._appointmentRepository.findAppointmentById(idToUse);
             if (appointment && appointment.prescriptionId) {
-                prescription = await this._prescriptionRepository.findById(appointment.prescriptionId.toString());
+                prescription = await this._prescriptionRepository.findPrescriptionById(appointment.prescriptionId.toString());
             }
         }
 
@@ -205,7 +205,7 @@ export class PrescriptionService implements IPrescriptionService {
         const appointment = await this._appointmentRepository.findWithDetails(apptQuery);
         let apptToUse;
         if (!appointment || appointment.length === 0) {
-            apptToUse = await this._appointmentRepository.findById(apptIdToUse);
+            apptToUse = await this._appointmentRepository.findAppointmentById(apptIdToUse);
             if (!apptToUse) throw new NotFoundError('Appointment not found');
         } else {
             apptToUse = appointment[0];

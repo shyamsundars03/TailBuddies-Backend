@@ -11,7 +11,7 @@ import {
     CancelAppointmentSchema,
     GetAvailableSlotsQueryInput,
 } from '../../dto/appointment/appointment.schema';
-import { UnauthorizedError } from '../../errors/app-error';
+
 
 export class AppointmentController {
     private readonly _appointmentService: IAppointmentService;
@@ -21,8 +21,7 @@ export class AppointmentController {
     }
 
     create = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         // console.log("Appointment Create Body:", req.body);
         const data = req.body as CreateAppointmentInput;
@@ -35,8 +34,7 @@ export class AppointmentController {
     };
 
     getOwnerAppointments = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 10;
@@ -53,8 +51,7 @@ export class AppointmentController {
     };
 
     getDoctorAppointments = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const { status } = req.query;
         const page = parseInt(req.query.page as string) || 1;
@@ -75,16 +72,14 @@ export class AppointmentController {
     };
 
     getStats = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const result = await this._appointmentService.getDoctorStats(userId);
         res.status(HttpStatus.OK).json(ApiResponse.success('Stats fetched', result));
     };
 
     getOwnerStats = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const result = await this._appointmentService.getOwnerStats(userId);
         res.status(HttpStatus.OK).json(ApiResponse.success('Stats fetched', result));
@@ -97,8 +92,7 @@ export class AppointmentController {
     };
 
     updateStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const id = req.params.id as string;
         const { status, reason } = UpdateAppointmentStatusSchema.parse(req.body);
@@ -133,8 +127,7 @@ export class AppointmentController {
     };
 
     cancel = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const id = req.params.id as string;
         const { reason } = CancelAppointmentSchema.parse(req.body);
@@ -172,8 +165,7 @@ export class AppointmentController {
     };
 
     getPatientsByDoctor = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 10;
@@ -195,8 +187,7 @@ export class AppointmentController {
     };
 
     getDoctorSlots = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const { date } = req.query;
         const result = await this._appointmentService.getAllSlotsForDoctor(userId, date as string);

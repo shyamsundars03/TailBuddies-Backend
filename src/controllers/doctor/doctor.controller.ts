@@ -4,7 +4,7 @@ import { HttpStatus } from '../../constants';
 import logger from '../../logger';
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 import { ApiResponse } from '../../utils/api-response';
-import { UnauthorizedError, ValidationError } from '../../errors/app-error';
+import {  ValidationError } from '../../errors/app-error';
 import { UpdateDoctorProfileSchema, VerifyDoctorSchema } from '../../dto/doctor/doctor.schema';
 
 export class DoctorController {
@@ -15,8 +15,7 @@ export class DoctorController {
     }
 
     getProfile = async (req: AuthenticatedRequest, res: Response) => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
         
         const profile = await this._doctorService.getDoctorProfile(userId);
         res.status(HttpStatus.OK).json(ApiResponse.success('Profile fetched', profile));
@@ -29,8 +28,7 @@ export class DoctorController {
     };
 
     updateProfile = async (req: AuthenticatedRequest, res: Response) => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
         
         const parsed = UpdateDoctorProfileSchema.safeParse(req.body);
         if (!parsed.success) {
@@ -91,8 +89,7 @@ export class DoctorController {
     };
 
     requestVerification = async (req: AuthenticatedRequest, res: Response) => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
         
         logger.info(`[DoctorController] Attempting to request verification for doctor with userId: ${userId}`);
         const updatedDoctor = await this._doctorService.requestVerification(userId);

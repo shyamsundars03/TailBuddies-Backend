@@ -4,7 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 // import mongoose from 'mongoose';
-import { env } from './config/env';
+// import { env } from './config/env';
 import logger from './logger';
 import { HttpStatus } from './constants';
 import routes from './routes';
@@ -29,7 +29,6 @@ const app = express();
 // Middleware
 app.use(cookieParser());
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -56,7 +55,13 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/slots', slotRoutes);
 app.use('/api', routes);
 
-
+app.get('/status', (req, res) => {
+  res.json({
+    status: 'success',
+    message: 'Tailbuddies Backend is running!',
+    timestamp: new Date()
+  });
+});
 
 
 
@@ -70,13 +75,6 @@ app.use((req, res) => {
     originalUrl: req.originalUrl,
   });
 });
-
-
-
-
-
-
-
 
 
 

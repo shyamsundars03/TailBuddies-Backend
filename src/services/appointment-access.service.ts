@@ -11,7 +11,7 @@ export class AppointmentAccessService {
     ) {}
 
     async assertAppointmentAccess(appointmentId: string, userId: string, role: string): Promise<IAppointment> {
-        const appointment = await this._appointmentRepository.findById(appointmentId);
+        const appointment = await this._appointmentRepository.findAppointmentById(appointmentId);
         if (!appointment) {
             throw new NotFoundError('Appointment not found');
         }

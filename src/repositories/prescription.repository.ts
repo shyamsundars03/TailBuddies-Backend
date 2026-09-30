@@ -18,7 +18,7 @@ export class PrescriptionRepository extends BaseRepository<IPrescription> implem
             .exec();
     }
 
-    async findById(id: string): Promise<IPrescription | null> {
+    async findPrescriptionById(id: string): Promise<IPrescription | null> {
         return await this._model.findById(id)
             .populate({
                 path: 'vetId',

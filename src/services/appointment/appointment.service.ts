@@ -339,7 +339,7 @@ export class AppointmentService implements IAppointmentService {
     }
 
     async updateAppointmentStatus(appointmentId: string, status: AppointmentStatus, userId: string): Promise<IAppointment> {
-        const appointment = await this._appointmentRepository.findById(appointmentId);
+        const appointment = await this._appointmentRepository.findAppointmentById(appointmentId);
         if (!appointment) throw new NotFoundError('Appointment not found');
 
         if (!appointment.appointmentId) {
@@ -436,7 +436,7 @@ export class AppointmentService implements IAppointmentService {
         }
 
         try {
-            const appointment = await this._appointmentRepository.findById(appointmentId);
+            const appointment = await this._appointmentRepository.findAppointmentById(appointmentId);
             if (!appointment) throw new AppError('Appointment not found', HttpStatus.NOT_FOUND);
 
             if (appointment.status === AppointmentStatus.COMPLETED || appointment.status === AppointmentStatus.CANCELLED) {
@@ -944,7 +944,7 @@ export class AppointmentService implements IAppointmentService {
 
 
     async checkIn(appointmentId: string, role: 'owner' | 'doctor'): Promise<IAppointment> {
-        const appt = await this._appointmentRepository.findById(appointmentId);
+        const appt = await this._appointmentRepository.findAppointmentById(appointmentId);
         if (!appt) throw new NotFoundError('Appointment not found');
 
         const now = new Date();
@@ -1002,7 +1002,7 @@ export class AppointmentService implements IAppointmentService {
     }
 
     async checkOut(appointmentId: string, role: 'owner' | 'doctor'): Promise<IAppointment> {
-        const appt = await this._appointmentRepository.findById(appointmentId);
+        const appt = await this._appointmentRepository.findAppointmentById(appointmentId);
         if (!appt) throw new NotFoundError('Appointment not found');
 
         const now = new Date();
@@ -1199,7 +1199,7 @@ export class AppointmentService implements IAppointmentService {
     }
 
     async cancelPendingAppointment(appointmentId: string): Promise<IAppointment> {
-        const appointment = await this._appointmentRepository.findById(appointmentId);
+        const appointment = await this._appointmentRepository.findAppointmentById(appointmentId);
         if (!appointment) throw new NotFoundError('Appointment not found');
 
         if (appointment.status !== AppointmentStatus.PAYMENT_PENDING) {
@@ -1234,7 +1234,7 @@ export class AppointmentService implements IAppointmentService {
         logger.info('Appointment confirmed and slot locked', { appointmentId, slotId });
     }
     async checkSlotAvailability(id: string): Promise<boolean> {
-        const appointment = await this._appointmentRepository.findById(id);
+        const appointment = await this._appointmentRepository.findAppointmentById(id);
         if (!appointment) throw new NotFoundError('Appointment not found');
 
         const slot = await Slot.findById(appointment.slotId);

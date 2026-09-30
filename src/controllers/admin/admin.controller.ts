@@ -3,8 +3,8 @@ import { IAdminService } from '../../services/interfaces/IAdminService';
 import { IDoctorService } from '../../services/interfaces/IDoctorService';
 import { HttpStatus, SuccessMessages } from '../../constants';
 import { ApiResponse } from '../../utils/api-response';
-import { env } from '../../config/env';
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
+import { setRefreshTokenCookie } from '../../utils/cookie.util';
 
 export class AdminController {
     private readonly _adminService: IAdminService;
@@ -17,13 +17,7 @@ export class AdminController {
 
     adminLogin = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
         const result = await this._adminService.adminLogin(req.body);
-
-        res.cookie('refreshToken', result.refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: env.jwtRefreshMaxAge,
-        });
+        setRefreshTokenCookie(res, result.refreshToken);
 
         res.status(HttpStatus.OK).json(ApiResponse.success(SuccessMessages.ADMIN_LOGIN, {
             user: {

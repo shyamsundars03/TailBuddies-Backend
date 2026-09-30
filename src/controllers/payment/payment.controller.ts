@@ -4,7 +4,7 @@ import { HttpStatus } from '../../constants';
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 import { ApiResponse } from '../../utils/api-response';
 import { CreateOrderSchema, VerifyPaymentSchema, WithdrawRequestSchema, RetryPaymentSchema } from '../../dto/payment/payment.schema';
-import { UnauthorizedError } from '../../errors/app-error';
+
 
 export class PaymentController {
     private readonly _paymentService: IPaymentService;
@@ -14,8 +14,7 @@ export class PaymentController {
     }
 
     createOrder = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const { amount, appointmentId } = CreateOrderSchema.parse(req.body);
         const result = await this._paymentService.createRazorpayOrder(amount, appointmentId, userId);
@@ -29,16 +28,14 @@ export class PaymentController {
     };
 
     getWallet = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const result = await this._paymentService.getWallet(userId);
         res.status(HttpStatus.OK).json(ApiResponse.success('Wallet fetched', result));
     };
 
     payWithWallet = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const { amount, appointmentId } = CreateOrderSchema.parse(req.body);
         await this._paymentService.processWalletPayment(userId, amount, appointmentId);
@@ -46,8 +43,7 @@ export class PaymentController {
     };
 
     getTransactions = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 10;
@@ -88,8 +84,7 @@ export class PaymentController {
     };
 
     requestWithdrawal = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const { amount } = WithdrawRequestSchema.parse(req.body);
         await this._paymentService.requestWithdrawal(userId, amount);

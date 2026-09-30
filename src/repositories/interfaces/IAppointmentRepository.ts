@@ -3,6 +3,7 @@ import { IAppointment } from '../../models/appointment.model';
 import { IBaseRepository } from '../base/base.repository.interface';
 
 export interface IAppointmentRepository extends IBaseRepository<IAppointment> {
+  findAppointmentById(id: string): Promise<IAppointment | null>;
   findWithDetails(query: Record<string, unknown>): Promise<IAppointment[]>;
   findWithPagination(query: Record<string, unknown>, page: number, limit: number): Promise<{ items: IAppointment[], total: number }>;
   countDocuments(query?: Record<string, unknown>): Promise<number>;

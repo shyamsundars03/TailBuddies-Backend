@@ -4,7 +4,7 @@ import { HttpStatus } from '../../constants';
 import { AuthenticatedRequest } from '../../interfaces/express-request.interface';
 import { ApiResponse } from '../../utils/api-response';
 import { PetSchema, ToggleActiveSchema } from '../../dto/pet/pet.schema';
-import { UnauthorizedError, ForbiddenError } from '../../errors/app-error';
+import {  ForbiddenError } from '../../errors/app-error';
 
 export class UserPetController {
     private readonly _petService: IPetService;
@@ -14,8 +14,7 @@ export class UserPetController {
     }
 
     addPet = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const bodyData = { ...req.body };
         const files = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -42,8 +41,7 @@ export class UserPetController {
     };
 
     getOwnerPets = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
-        if (!userId) throw new UnauthorizedError();
+        const userId = req.user!.userId;
 
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 5;
@@ -57,9 +55,8 @@ export class UserPetController {
     };
 
     getPetById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
+        const userId = req.user!.userId;
         const id = req.params.id as string;
-        if (!userId) throw new UnauthorizedError();
 
         const pet = await this._petService.getPetById(id);
         const userRole = req.user?.role;
@@ -72,9 +69,8 @@ export class UserPetController {
     };
 
     updatePet = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
+        const userId = req.user!.userId;
         const id = req.params.id as string;
-        if (!userId) throw new UnauthorizedError();
 
         const bodyData = { ...req.body };
         const files = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -101,9 +97,8 @@ export class UserPetController {
     };
 
     toggleActiveStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
+        const userId = req.user!.userId;
         const id = req.params.id as string;
-        if (!userId) throw new UnauthorizedError();
 
         const { isActive } = ToggleActiveSchema.parse(req.body);
         const pet = await this._petService.toggleActiveStatus(id, userId, isActive);
@@ -111,9 +106,8 @@ export class UserPetController {
     };
 
     deletePet = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-        const userId = req.user?.userId;
+        const userId = req.user!.userId;
         const id = req.params.id as string;
-        if (!userId) throw new UnauthorizedError();
 
         await this._petService.deletePet(id, userId);
         res.status(HttpStatus.OK).json(ApiResponse.success('Pet deleted successfully'));
